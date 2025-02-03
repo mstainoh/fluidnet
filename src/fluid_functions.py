@@ -1,4 +1,26 @@
 # src/fluid_functions.py
+"""
+Fluid dynamics functions for calculating various fluid flow parameters.
+
+This module includes functions to calculate Reynolds number, Froude number,
+friction factor, and pressure gradient for single-phase fluid flow.
+
+Functions
+---------
+reynolds(v, D, density=1000, viscosity=0.001)
+    Calculate the Reynolds number.
+froid(v, D)
+    Calculate the Froude number.
+_chen_approx(re, eD)
+    Chen approximation for turbulent friction factor.
+find_friction_factor(re, eD, fanning=True)
+    Calculate the friction factor for fluid flow.
+single_phase_pressure_gradient(flow_rate, D, density=1000, viscosity=1e-3, inc=0,
+                               eps=0.15e-3, compressibility=0, L=1, K=0,
+                               output_array=False, as_head=False)
+    Calculate the pressure gradient for single-phase fluid flow.
+"""
+
 import numpy as np
 from scipy import constants as spc
 import functools

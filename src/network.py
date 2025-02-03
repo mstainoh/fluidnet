@@ -1,9 +1,42 @@
+"""
+Fluid Flow Network Module
+
+This module provides functionality to model and analyze fluid flow networks using
+directed graphs. It includes functions to calculate flow and head within the network
+and a `Network` class to represent the network structure and perform calculations.
+
+Functions
+---------
+get_h_from_Q(flow_rate, D, density=1000, viscosity=1e-3, inc=0, eps=0.15e-3, compressibility=0, L=1, K=0, output_array=False, as_head=False)
+    Calculate the head from the flow rate using the single-phase head gradient function.
+get_Q_from_h(head, D, density=1000, viscosity=1e-3, inc=0, eps=0.15e-3, compressibility=0, L=1, K=0, output_array=False, as_head=False)
+    Calculate the flow rate from the head using the inverse of the single-phase head gradient function.
+
+Classes
+-------
+Network
+    Represents a fluid flow network with nodes and edges, allowing calculations of flows and heads.
+
+Imports
+-------
 from aux_func import inverse_function
 from fluid_functions import single_phase_head_gradient
 import networkx as nx
 import numpy as np
 import warnings
 from scipy.optimize import root
+
+__all__ = ['Network', 'get_h_from_Q', 'get_Q_from_h']
+"""
+
+from aux_func import inverse_function
+from fluid_functions import single_phase_head_gradient
+import networkx as nx
+import numpy as np
+import warnings
+from scipy.optimize import root
+
+__all__ = ['Network', 'get_h_from_Q', 'get_Q_from_h']
 
 # Define flow and head functions
 get_h_from_Q = single_phase_head_gradient
