@@ -216,7 +216,7 @@ class Network:
         """
         return dict(self.common_parameters)
 
-    def get_edge_flow(self, n1, n2, dh):
+    def get_edge_flow(self, n1, n2, dh, **kwargs):
         """
         Calculate the flow for a given edge and head difference.
 
@@ -228,16 +228,22 @@ class Network:
             Ending node of the edge.
         dh : float
             Head difference.
+        **kwargs: dict(optional)
+            additional parameters to be passed to self.get_flow_from_potential.
+            Note, these will overwrite edge and common parameters, if duplicated.
 
         Returns
         -------
         float
             Calculated flow.
         """
-        edge_params = self.get_edge_parameters(n1, n2)
-        return self.get_flow_from_potential(dh, **edge_params, **self.common_parameters)
+        func_kwargs = dict()
+        func_kwargs.update(self.get_edge_parameters(n1, n2))
+        func_kwargs.update(self.common_parameters)
+        func_kwargs.update(kwargs)
+        return self.get_flow_from_potential(dh, **func_kwargs)
 
-    def get_edge_dh(self, n1, n2, flow):
+    def get_edge_dh(self, n1, n2, flow, **kwargs):
         """
         Calculate the head difference for a given edge and flow.
 
@@ -249,14 +255,21 @@ class Network:
             Ending node of the edge.
         flow : float
             Flow through the edge.
+        **kwargs: dict(optional)
+            additional parameters to be passed to self.get_potential_from_flow
+            Note, these will overwrite edge and common parameters, if duplicated.
+
 
         Returns
         -------
         float
             Calculated head difference.
         """
-        edge_params = self.get_edge_parameters(n1, n2)
-        return self.get_potential_from_flow(flow, **edge_params, **self.common_parameters)
+        func_kwargs = dict()
+        func_kwargs.update(self.get_edge_parameters(n1, n2))
+        func_kwargs.update(self.common_parameters)
+        func_kwargs.update(kwargs)
+        return self.get_potential_from_flow(flow, **func_kwargs)
 
     def get_node_flows(self, edge_flows, nodes=None):
         """
