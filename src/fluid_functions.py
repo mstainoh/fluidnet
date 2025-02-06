@@ -17,7 +17,7 @@ find_friction_factor(re, eD, fanning=True)
     Calculate the friction factor for fluid flow.
 single_phase_pressure_gradient(flow_rate, D, density=1000, viscosity=1e-3, inc=0,
                                eps=0.15e-3, compressibility=0, L=1, K=0,
-                               output_array=False, as_head=False)
+                               output_components=False, as_head=False)
     Calculate the pressure gradient for single-phase fluid flow.
 """
 
@@ -126,7 +126,7 @@ def find_friction_factor(re, eD, fanning=True):
 def single_phase_pressure_gradient(
     flow_rate, D, density=1000, viscosity=1e-3, inc=0,
     eps=0.15e-3, compressibility=0, L=1, K=0,
-    output_array=False, as_head=False):
+    output_components=False, full_output=False, as_head=False):
     """
     Calculate the pressure gradient for single-phase fluid flow.
 
@@ -154,10 +154,12 @@ def single_phase_pressure_gradient(
     K: float
       additional pressure loss factors for elbows, valve, etc.
       Default is 0.
-    output_array: bool
+    output_components: bool
       if True, returns the three components of pressure loss (gravity gradient, friction gradient, momentum gradient).
       Otherwise returns the sum.
       Default is False
+    full_output: bool
+        if True, returns dictionary of intermediate calculations. Default is False.
     as_head: bool
       if True, returns the pressure drop as head (m), otherwise in Pa. 
       Default is False.
@@ -173,7 +175,7 @@ def single_phase_pressure_gradient(
     v = flow_rate / A
     re = reynolds(v, D, density, viscosity)
     f = find_friction_factor(re=re, eD=eD, fanning=False)
-    dPf = - (f / (2 * D) * L + K) * v**2 / spc.g
+    dPf = - (f / D * L + K) * v**2 / (2 * spc.g)
     Eh = compressibility * v**2 / spc.g
     if np.any(Eh >= 1):
         raise ValueError("Supersonic flow encountered.")
@@ -184,8 +186,11 @@ def single_phase_pressure_gradient(
         dPg *= density * spc.g
         dPf *= density * spc.g
         dPv *= density * spc.g
-    if output_array:
-        return dPg, dPf, dPv
-    return dPg + dPf + dPv
+    if full_output:
+        return dict(total_loss=dPf + dPg + dPv, friction_loss=dPf, gravity_loss=dPg, kinetic_loss= dPv, friction_factor=f, reynolds=re, v=v, eD=eD,)
+    elif output_components:
+        return (dPg, dPf, dPv)
+    else:
+        return dPg + dPf + dPv
 
 single_phase_head_gradient = functools.partial(single_phase_pressure_gradient, as_head=True)
