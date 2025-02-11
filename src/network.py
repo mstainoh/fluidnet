@@ -29,6 +29,7 @@ from scipy.optimize import root
 __all__ = ['Network', 'get_h_from_Q', 'get_Q_from_h']
 """
 
+import pickle
 from aux_func import inverse_function
 from fluid_functions import single_phase_head_gradient
 import networkx as nx
@@ -69,6 +70,8 @@ class Network:
         If True, enables debug mode for verbose outputs (default: False).
     common_parameters : dict, optional
         Common parameters shared across all edges (e.g., fluid density, viscosity).
+    
+    Note: if a parameter is both in the edge and in the common_parameters, the former will override the latter
 
     Attributes
     ----------
@@ -103,6 +106,30 @@ class Network:
 
         self.boundary_conditions = dict()
         self.debug = debug
+
+    def save(self, filename):
+        """
+        Save the current state of the Network object to a file.
+
+        Parameters:
+        filename (str or Path): The path to the file where the object will be saved.
+        """
+        with open(filename, 'wb') as file:
+            pickle.dump(self, file)
+    
+    @staticmethod
+    def load(filename):
+        """
+        Load the state of a Network object from a file.
+
+        Parameters:
+        filename (str or Path): The path to the file from which the object will be loaded.
+
+        Returns:
+        Network: The loaded Network object.
+        """
+        with open(filename, 'rb') as file:
+            return pickle.load(file)
 
     def reverse_network(self):
         """
@@ -212,7 +239,9 @@ class Network:
         Returns
         -------
         dict
-            Common parameters.
+            Common parameters (copy).
+        
+        Note: returns a copy. Use self.common_parameters to get the reference to the actual dictionary.
         """
         return dict(self.common_parameters)
 
@@ -238,8 +267,8 @@ class Network:
             Calculated flow.
         """
         func_kwargs = dict()
-        func_kwargs.update(self.get_edge_parameters(n1, n2))
         func_kwargs.update(self.common_parameters)
+        func_kwargs.update(self.get_edge_parameters(n1, n2))
         func_kwargs.update(kwargs)
         return self.get_flow_from_potential(dh, **func_kwargs)
 
@@ -266,8 +295,8 @@ class Network:
             Calculated head difference.
         """
         func_kwargs = dict()
-        func_kwargs.update(self.get_edge_parameters(n1, n2))
         func_kwargs.update(self.common_parameters)
+        func_kwargs.update(self.get_edge_parameters(n1, n2))
         func_kwargs.update(kwargs)
         return self.get_potential_from_flow(flow, **func_kwargs)
 
@@ -277,7 +306,7 @@ class Network:
 
         This method determines the flow into and out of each node using the provided
         edge flows. If specific nodes are specified, it returns the flows only for
-        those nodes.
+        those nodes. Does not guarantee node balance.
 
         Parameters
         ----------
@@ -584,6 +613,55 @@ class Network:
         Hs[~nodes_head_mask] = Hs_sub
 
         return Hs
+
+    def balance_solve(self, head_bc=None, rate_bc=None, mix_bc=None, root_kwargs=dict(), as_dict=True):
+        """
+        Solves a system for a given set of boundary conditions.
+        
+        Equivalent to:
+            set_boundary_conditions
+            solve for node heads
+            get edge rates
+            get node rates
+            return node_rates, edge_rates, node_heads
+
+        Parameters
+        ----------
+        head_bc : dict, optional
+            Boundary conditions for head (node: value).
+        rate_bc : dict, optional
+            Boundary conditions for flow rates (node: value).
+        mix_bc : dict, optional
+            Mixed boundary conditions.
+        root_kwargs : dict
+            Additional arguments to pass to `scipy.optimize.root`.
+        as_dict: bool
+            if True, returns the output as dictionary. Otherwise as array. Default is True.
+
+        Returns
+        -------
+        node_rates : dict or array
+            Flow rates at each node (node: rate)
+        edge_rates : dict or array
+            Flow rates through each edge (edge: rate).
+        node_heads : dict or array
+            Heads (pressure values) at each node (node: head).
+        
+        Note: node and edge values are in the same order as self.nodes and self.edges, respectively.
+
+        Raises
+        ------
+        AssertionError
+            If boundary conditions are missing.
+
+        """
+        self.set_boundary_conditions(head_bc=head_bc, rate_bc=rate_bc, mix_bc=mix_bc)
+        node_heads = self.balance(**root_kwargs)
+        edge_rates = self.get_edge_flows(dict(zip(self.nodes, node_heads)))
+        _, node_rates = self.get_node_flows(edge_rates)
+        if as_dict:
+            return dict(zip(self.nodes, node_rates)), dict(zip(self.edges, edge_rates)), dict(zip(self.nodes, node_heads))
+        return node_rates, edge_rates, node_heads
 
 
     def get_head_from_edge_rates(self, edge_rates, end_head=0):
