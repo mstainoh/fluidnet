@@ -109,27 +109,32 @@ class Network:
 
     def save(self, filename):
         """
-        Save the current state of the Network object to a file.
+        Saves the graph
 
         Parameters:
         filename (str or Path): The path to the file where the object will be saved.
         """
         with open(filename, 'wb') as file:
-            pickle.dump(self, file)
+            pickle.dump(self.G, file)
     
     @staticmethod
-    def load(filename):
+    def load(filename, **kwargs):
         """
-        Load the state of a Network object from a file.
+        Loads the Graph and creates a network from it.
 
         Parameters:
         filename (str or Path): The path to the file from which the object will be loaded.
+        **kwargs: additional initialization parameters
 
         Returns:
         Network: The loaded Network object.
         """
         with open(filename, 'rb') as file:
-            return pickle.load(file)
+            G = pickle.load(file)
+        n = Network([], **kwargs) 
+        n.G = G
+        return n
+
 
     def reverse_network(self):
         """
