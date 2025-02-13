@@ -499,11 +499,11 @@ class Network:
 
         # Ensure the graph is valid for propagation
         if self.is_single_outflow() and from_source:
-            assert set(self.get_source_nodes()).issubset(rate_bc.keys()), (
+            assert set(self.get_source_nodes()).issubset(node_rates.keys()), (
                 "Some source nodes do not have a rate boundary condition"
             )
         elif self.is_single_inflow() and not from_source:
-            assert set(self.get_sink_nodes()).issubset(rate_bc.keys()), (
+            assert set(self.get_sink_nodes()).issubset(node_rates.keys()), (
                 "Some sink nodes do not have a rate boundary condition"
             )
         else:
