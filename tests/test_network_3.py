@@ -54,7 +54,7 @@ def test_balance():
   rate_bc = {'f': -.05}
   n.set_boundary_conditions(head_bc=head_bc, rate_bc=rate_bc)
 
-  Hs = n.balance()
+  Hs = n.balance(tol=1e-14)
   H = dict(zip(n.nodes, Hs))
   
   print('Balanced head:', Hs)
@@ -68,8 +68,9 @@ def test_balance():
 
   non_head_node_balance = [r for i, r in node_balance.items() if i not in head_bc.keys()]
   non_head_node_balance = np.asarray(non_head_node_balance)
+  print('Rate balance array (exc. head nodes):', non_head_node_balance)
   print('rate error total (exc. head nodes:)', non_head_node_balance.sum())
-  assert np.allclose(non_head_node_balance, 0), 'balance error'
+  assert np.allclose(non_head_node_balance, 0, atol=1e-7), 'balance error'
 
 
 

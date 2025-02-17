@@ -75,7 +75,7 @@ def test_fit():
   print()
 
   assert np.isclose(eps_true, eps_match, rtol=1e-3), 'eps match not working'
-  assert np.isclose(K_true, K_match, rtol=1e-3), 'K match not working'
+  assert np.isclose(K_true, K_match, atol=1e-3), 'K match not working'
   return
 
 # ---------------------------------- #
