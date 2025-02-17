@@ -14,8 +14,7 @@ def inverse_function(f, method='brentq', bracket=None, vectorize=True, **root_sc
         The root-finding method. Supported methods: 'brentq', 'bisect', etc.
     - bracket: tuple or None
         If using a bracketing method (e.g., 'brentq'), specify (a, b) where f(a) and f(b) must have opposite signs.
-    - tol: float (default=1e-8)
-        Tolerance for the solution.
+    - root_scalar_kwargs (optional): additional parameters to be passed to scipy.optimize.root_scalar
 
     Returns:
     - x: float
