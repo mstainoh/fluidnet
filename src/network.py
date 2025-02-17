@@ -39,11 +39,13 @@ from scipy.optimize import root
 
 __all__ = ['Network', 'get_h_from_Q', 'get_Q_from_h']
 
-# Define flow and head functions
+# Define default flow and head functions
 get_h_from_Q = single_phase_head_gradient
-get_Q_from_h = inverse_function(
-    get_h_from_Q, x0=0, bracket=[-1e6, 1e6], vectorize=False
-)
+
+def get_Q_from_h(h1, h0=0, vectorize=True, **kwargs):
+    dh = h1 - h0
+    finv = inverse_function(get_h_from_Q, x0=0, bracket=[-1e6, 1e6], vectorize=vectorize)
+    return finv(dh)
 
 class Network:
     """
@@ -63,9 +65,11 @@ class Network:
         A dictionary of node attributes, with node IDs as keys and attribute
         dictionaries as values.
     flow_from_potential : callable, optional
-        Function to calculate flow from head difference (default: `get_Q_from_h`).
+        Function to calculate flow from head difference. (default: `get_Q_from_h`).
     potential_from_flow : callable, optional
-        Function to calculate head difference from flow (default: `get_h_from_Q`).
+        Function to calculate head difference from flow.
+        It should be of the form lambda rate, initial_potential, **kwargs: end_potential
+        (default: `get_h_from_Q`).
     debug : bool, optional
         If True, enables debug mode for verbose outputs (default: False).
     common_parameters : dict, optional
@@ -259,7 +263,7 @@ class Network:
         return dict(self.common_parameters)
 
     # %% basic calculations
-    def get_edge_flow(self, n1, n2, dh, **kwargs):
+    def get_edge_flow(self, n1, n2, h1, h0=0, **kwargs):
         """
         Calculate the flow for a given edge and head difference.
 
@@ -269,8 +273,10 @@ class Network:
             Starting node of the edge.
         n2 : node
             Ending node of the edge.
-        dh : float
-            Head difference.
+        h1 : float
+            End head
+        h0: float
+            Initial head (default is 0).
         **kwargs: dict(optional)
             additional parameters to be passed to self.get_flow_from_potential.
             Note, these will overwrite edge and common parameters, if duplicated.
@@ -284,7 +290,7 @@ class Network:
         func_kwargs.update(self.common_parameters)
         func_kwargs.update(self.get_edge_parameters(n1, n2))
         func_kwargs.update(kwargs)
-        return self.get_flow_from_potential(dh, **func_kwargs)
+        return self.get_flow_from_potential(h1, h0, **func_kwargs)
 
     def get_edge_dh(self, n1, n2, flow, h0=0, **kwargs):
         """
@@ -314,7 +320,7 @@ class Network:
         func_kwargs.update(self.common_parameters)
         func_kwargs.update(self.get_edge_parameters(n1, n2))
         func_kwargs.update(kwargs)
-        return self.get_potential_from_flow(flow, **func_kwargs)
+        return self.get_potential_from_flow(flow, h0, **func_kwargs)
 
     def get_node_flows(self, edge_flows, nodes=None):
         """
