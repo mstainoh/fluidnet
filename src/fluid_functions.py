@@ -125,10 +125,10 @@ def find_friction_factor(re, eD, fanning=True):
 
 def single_phase_pressure_gradient(
     flow_rate, D, density=1000, viscosity=1e-3, inc=0,
-    eps=0.15e-3, compressibility=0, L=1, K=0,
-    output_components=False, full_output=False, as_head=False):
+    eps=0.15e-3, compressibility=0, L=1, K=0, P0=0,
+    output_components=False, full_output=False, as_head=False, ):
     """
-    Calculate the pressure gradient for single-phase fluid flow.
+    Calculate the pressure gradient or pressure difference for single-phase fluid flow.
 
     Parameters
     ----------
@@ -148,12 +148,15 @@ def single_phase_pressure_gradient(
     compressibility: float
         compressibility of fluid in Pa**-1 (default 0)
     L: float
-      length of pipe. Default value 1 will return the gradient.
+      length of pipe. Default value 1, which will return the gradient.
       For incompressible fluids setting L can be used to obtain the total loss
       Default is 1.
     K: float
       additional pressure loss factors for elbows, valve, etc.
       Default is 0.
+    P0: float
+        initial pressure. For incompressible fluids, setting a value of P0 can be used to return the end pressure.
+        Default is 0. Ignored if output_components is set to True
     output_components: bool
       if True, returns the three components of pressure loss (gravity gradient, friction gradient, momentum gradient).
       Otherwise returns the sum.
@@ -186,11 +189,12 @@ def single_phase_pressure_gradient(
         dPg *= density * spc.g
         dPf *= density * spc.g
         dPv *= density * spc.g
+    total_loss = dPg + dPf + dPv + P0
     if full_output:
-        return dict(total_loss=dPf + dPg + dPv, friction_loss=dPf, gravity_loss=dPg, kinetic_loss= dPv, friction_factor=f, reynolds=re, v=v, eD=eD,)
+        return dict(total_loss=total_loss, friction_loss=dPf, gravity_loss=dPg, kinetic_loss= dPv, friction_factor=f, reynolds=re, v=v, eD=eD,)
     elif output_components:
         return (dPg, dPf, dPv)
     else:
-        return dPg + dPf + dPv
+        return total_loss
 
 single_phase_head_gradient = functools.partial(single_phase_pressure_gradient, as_head=True)
