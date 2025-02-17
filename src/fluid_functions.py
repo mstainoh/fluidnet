@@ -169,8 +169,8 @@ def single_phase_pressure_gradient(
 
     Returns
     -------
-    float or tuple
-        Total gradient or an array of gradients.
+    float or tuple or dict
+        Total gradient or an array of gradients (dPg, dPf, dPv).
     """
     dPg = -inc * L
     A = D**2 / 4 * np.pi

@@ -65,10 +65,12 @@ class Network:
         A dictionary of node attributes, with node IDs as keys and attribute
         dictionaries as values.
     flow_from_potential : callable, optional
-        Function to calculate flow from head difference. (default: `get_Q_from_h`).
+        Function to calculate flow from head difference.
+        It should be of the form lambda Q, h0, **kwargs: h1
+        (default: `get_Q_from_h`).
     potential_from_flow : callable, optional
         Function to calculate head difference from flow.
-        It should be of the form lambda rate, initial_potential, **kwargs: end_potential
+        It should be of the form lambda rate, h0, **kwargs: h1
         (default: `get_h_from_Q`).
     debug : bool, optional
         If True, enables debug mode for verbose outputs (default: False).
@@ -76,6 +78,7 @@ class Network:
         Common parameters shared across all edges (e.g., fluid density, viscosity).
     
     Note: if a parameter is both in the edge and in the common_parameters, the former will override the latter
+    Note: flow_from_potential and potential_from_flow should have the same **kwargs
 
     Attributes
     ----------
@@ -383,8 +386,7 @@ class Network:
         """
         def sub(e):
             n1, n2 = e
-            dh = Hs[n2] - Hs[n1]
-            return self.get_edge_flow(n1, n2, dh)
+            return self.get_edge_flow(n1, n2, Hs[n2], Hs[n1])
 
         return np.fromiter(map(sub, self.edges), float)
 
@@ -507,6 +509,12 @@ class Network:
             If the graph is not a valid single-inflow or single-outflow graph.
         AssertionError
             If required boundary conditions are missing for sources or sinks.
+        
+            
+        NOTE: for "from_source=True", back calculation cannot use initial head (h0) as argument
+
+        The reason is head is propagated backwards. Currently head_from_rate calculation does not support this
+        Therefore dh (h0=0) is used
         """
         # Initialize rates and heads
         node_rates = dict().fromkeys(self.nodes, 0)
@@ -557,14 +565,18 @@ class Network:
         if from_source:
             last_node = list(nx.topological_sort(self.G))[-1]
             node_heads[last_node] = H0
+            j = 0
             for n2 in nx.topological_sort(self.G.reverse()):
                 for edge in self.G.in_edges(n2):
                     edge_rate = edge_rates[edge]
+                    h1 = node_heads[edge[1]]
                     dh = self.get_edge_dh(*edge, edge_rate)
-                    node_heads[edge[0]] = node_heads[edge[1]] - dh
+                    h0 = h1 - dh
+                    node_heads[edge[0]] = h0
                     if self.debug:
-                        print(edge, dh, edge_rate)
-                        print(node_heads)
+                        print('Step {} - edge {}, h1 {}, h0 {}, rate {}'.format(j, edge, h1, h0, edge_rate))
+                        print('\t Heads:', {k: v for k, v in node_heads.items() if ~np.isnan(v)})
+                        j += 1
 
         # Calculate node heads (forward propagation)
         else:
@@ -573,8 +585,9 @@ class Network:
             for n1 in nx.topological_sort(self.G):
                 for edge in self.G.out_edges(n1):
                     edge_rate = edge_rates[edge]
-                    dh = self.get_edge_dh(*edge, edge_rate)
-                    node_heads[edge[1]] = node_heads[edge[0]] + dh
+                    h0 = node_heads[edge[0]]
+                    h1 = self.get_edge_dh(*edge, edge_rate, h0=h0)
+                    node_heads[edge[1]] = h1
 
         return node_rates, edge_rates, node_heads
 
