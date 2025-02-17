@@ -107,6 +107,7 @@ class Network:
         self.boundary_conditions = dict()
         self.debug = debug
 
+    # %% save - load methods
     def save(self, filename):
         """
         Saves the graph
@@ -117,8 +118,8 @@ class Network:
         with open(filename, 'wb') as file:
             pickle.dump(self.G, file)
     
-    @staticmethod
-    def load(filename, **kwargs):
+    @classmethod
+    def load(cls, filename, **kwargs):
         """
         Loads the Graph and creates a network from it.
 
@@ -131,11 +132,15 @@ class Network:
         """
         with open(filename, 'rb') as file:
             G = pickle.load(file)
+        return cls.from_network(G, **kwargs)
+    
+    @staticmethod
+    def from_network(G, **kwargs):
         n = Network([], **kwargs) 
         n.G = G
         return n
 
-
+    # %% basic methods
     def reverse_network(self):
         """
         Reverse the direction of the entire network.
@@ -161,6 +166,9 @@ class Network:
         Get all edges in the network.
         """
         return self.G.edges()
+
+    def get_node_parameters(self, n1):
+        return self.nodes[n1]
 
     def get_edge_parameters(self, n1, n2):
         """
@@ -250,6 +258,7 @@ class Network:
         """
         return dict(self.common_parameters)
 
+    # %% basic calculations
     def get_edge_flow(self, n1, n2, dh, **kwargs):
         """
         Calculate the flow for a given edge and head difference.
@@ -277,7 +286,7 @@ class Network:
         func_kwargs.update(kwargs)
         return self.get_flow_from_potential(dh, **func_kwargs)
 
-    def get_edge_dh(self, n1, n2, flow, **kwargs):
+    def get_edge_dh(self, n1, n2, flow, h0=0, **kwargs):
         """
         Calculate the head difference for a given edge and flow.
 
@@ -289,6 +298,8 @@ class Network:
             Ending node of the edge.
         flow : float
             Flow through the edge.
+        h0: float (optional)
+            Starting head. Default is 0.
         **kwargs: dict(optional)
             additional parameters to be passed to self.get_potential_from_flow
             Note, these will overwrite edge and common parameters, if duplicated.
