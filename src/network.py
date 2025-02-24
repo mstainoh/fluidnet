@@ -42,10 +42,10 @@ __all__ = ['Network', 'get_h_from_Q', 'get_Q_from_h']
 # Define default flow and head functions
 get_h_from_Q = single_phase_head_gradient
 
-def get_Q_from_h(h1, h0=0, vectorize=True, **kwargs):
-    dh = h1 - h0
-    finv = inverse_function(get_h_from_Q, x0=0, bracket=[-1e6, 1e6], vectorize=vectorize)
-    return finv(dh)
+def get_Q_from_h(h1, h2=0, **kwargs):
+    dh = h2 - h1
+    finv = inverse_function(get_h_from_Q, x0=0, bracket=[-1e8, 1e8], vectorize=True)
+    return finv(dh, **kwargs)
 
 class Network:
     """
@@ -93,14 +93,24 @@ class Network:
     """
 
     def __init__(
-        self, edges, node_attributes=dict(), 
+        self, edges=[], node_attributes=dict(), 
         flow_from_potential=get_Q_from_h, 
         potential_from_flow=get_h_from_Q,
         debug=False, common_parameters=dict()
     ):
         self.common_parameters = dict(common_parameters)
-        self.get_flow_from_potential = flow_from_potential
-        self.get_potential_from_flow = potential_from_flow
+
+        ermsg = 'at least 1 of flow_from_potential or potential_from_flow must be callable'
+        assert callable(flow_from_potential) or callable(potential_from_flow), ermsg  
+
+        if callable(flow_from_potential):
+            self.get_flow_from_potential = flow_from_potential
+        else:
+            raise NotImplementedError
+        if callable(potential_from_flow):
+            self.get_potential_from_flow = potential_from_flow
+        else:
+            raise NotImplementedError
 
         # Create the graph
         G = nx.DiGraph()
@@ -139,11 +149,11 @@ class Network:
         """
         with open(filename, 'rb') as file:
             G = pickle.load(file)
-        return cls.from_network(G, **kwargs)
+        return cls.from_graph(G, **kwargs)
     
     @staticmethod
-    def from_network(G, **kwargs):
-        n = Network([], **kwargs) 
+    def from_graph(G, **kwargs):
+        n = Network(**kwargs) 
         n.G = G
         return n
 
@@ -175,6 +185,18 @@ class Network:
         return self.G.edges()
 
     def get_node_parameters(self, n1):
+        """
+        Retrieve parameters for a specific node.
+
+        Parameters
+        ----------
+        n1 : node
+
+        Returns
+        -------
+        dict
+            Node parameters.
+        """
         return self.nodes[n1]
 
     def get_edge_parameters(self, n1, n2):
@@ -254,7 +276,7 @@ class Network:
 
     def get_common_parameters(self):
         """
-        Get common parameters for all edges.
+        Get common parameters used for edge_flow.
 
         Returns
         -------
@@ -266,7 +288,7 @@ class Network:
         return dict(self.common_parameters)
 
     # %% basic calculations
-    def get_edge_flow(self, n1, n2, h1, h0=0, **kwargs):
+    def get_edge_flow(self, n1, n2, h1, h2=0, **kwargs):
         """
         Calculate the flow for a given edge and head difference.
 
@@ -277,9 +299,9 @@ class Network:
         n2 : node
             Ending node of the edge.
         h1 : float
-            End head
+            Start head
         h0: float
-            Initial head (default is 0).
+            End head (default is 0).
         **kwargs: dict(optional)
             additional parameters to be passed to self.get_flow_from_potential.
             Note, these will overwrite edge and common parameters, if duplicated.
@@ -293,9 +315,9 @@ class Network:
         func_kwargs.update(self.common_parameters)
         func_kwargs.update(self.get_edge_parameters(n1, n2))
         func_kwargs.update(kwargs)
-        return self.get_flow_from_potential(h1, h0, **func_kwargs)
+        return self.get_flow_from_potential(h1, h2, **func_kwargs)
 
-    def get_edge_dh(self, n1, n2, flow, h0=0, **kwargs):
+    def get_edge_dh(self, n1, n2, flow, h1=None, h2=None, **kwargs):
         """
         Calculate the head difference for a given edge and flow.
 
@@ -307,8 +329,11 @@ class Network:
             Ending node of the edge.
         flow : float
             Flow through the edge.
-        h0: float (optional)
-            Starting head. Default is 0.
+        h1: float (optional)
+            Starting head. Default is None.
+        h2: float (optional)
+            End head. Default is None.
+
         **kwargs: dict(optional)
             additional parameters to be passed to self.get_potential_from_flow
             Note, these will overwrite edge and common parameters, if duplicated.
@@ -323,7 +348,7 @@ class Network:
         func_kwargs.update(self.common_parameters)
         func_kwargs.update(self.get_edge_parameters(n1, n2))
         func_kwargs.update(kwargs)
-        return self.get_potential_from_flow(flow, h0, **func_kwargs)
+        return self.get_potential_from_flow(flow, h1, h2, **func_kwargs)
 
     def get_node_flows(self, edge_flows, nodes=None):
         """
@@ -355,10 +380,14 @@ class Network:
         - The method uses the adjacency matrix of the graph to determine node connectivity.
         """
 
+        # get flows
         edge_flows = np.asarray(edge_flows).flatten()
+
+        # get nodes from adjacency matrix
         nfrom, nto = nx.adjacency_matrix(self.G).nonzero()
         flow_in = np.zeros(len(self), dtype=float)
         flow_out = flow_in.copy()
+
         for n1, n2, flow in zip(nfrom, nto, edge_flows):
           flow_in[n2] += flow
           flow_out[n1] -= flow
@@ -386,7 +415,7 @@ class Network:
         """
         def sub(e):
             n1, n2 = e
-            return self.get_edge_flow(n1, n2, Hs[n2], Hs[n1])
+            return self.get_edge_flow(n1, n2, Hs[n1], Hs[n2])
 
         return np.fromiter(map(sub, self.edges), float)
 
@@ -473,7 +502,7 @@ class Network:
         return self
 
 
-    def propagate_rates(self, rate_bc=None, from_source=True, H0=0):
+    def propagate_rates(self, rate_bc, from_source=True, H0=0, check=True):
         """
         Propagate flow rates and optionally calculate node heads in the network.
 
@@ -483,7 +512,7 @@ class Network:
 
         Parameters
         ----------
-        rate_bc : dict, optional
+        rate_bc : dict
             Boundary conditions for node flow rates (node: rate). If not provided, 
             uses the boundary conditions defined in the object.
         from_source : bool, optional
@@ -523,19 +552,20 @@ class Network:
         node_rates.update(rate_bc)
 
         # Ensure the graph is valid for propagation
-        if self.is_single_outflow() and from_source:
-            assert set(self.get_source_nodes()).issubset(node_rates.keys()), (
-                "Some source nodes do not have a rate boundary condition"
-            )
-        elif self.is_single_inflow() and not from_source:
-            assert set(self.get_sink_nodes()).issubset(node_rates.keys()), (
-                "Some sink nodes do not have a rate boundary condition"
-            )
-        else:
-            raise ValueError(
-                "Graph must be either single outflow with from_source=True or "
-                "single inflow with from_source=False"
-            )
+        if check:
+            if self.is_single_outflow() and from_source:
+                assert set(self.get_source_nodes()).issubset(node_rates.keys()), (
+                    "Some source nodes do not have a rate boundary condition"
+                )
+            elif self.is_single_inflow() and not from_source:
+                assert set(self.get_sink_nodes()).issubset(node_rates.keys()), (
+                    "Some sink nodes do not have a rate boundary condition"
+                )
+            else:
+                raise ValueError(
+                    "Graph must be either single outflow with from_source=True or "
+                    "single inflow with from_source=False"
+                )
 
         # Initialize edge rates and node heads
         edge_rates = dict().fromkeys(self.edges(), 0)
@@ -562,19 +592,19 @@ class Network:
             return node_rates, edge_rates, node_heads
 
         # Calculate node heads (backward propagation)
+        j = 0
         if from_source:
             last_node = list(nx.topological_sort(self.G))[-1]
             node_heads[last_node] = H0
-            j = 0
             for n2 in nx.topological_sort(self.G.reverse()):
                 for edge in self.G.in_edges(n2):
                     edge_rate = edge_rates[edge]
-                    h1 = node_heads[edge[1]]
-                    dh = self.get_edge_dh(*edge, edge_rate)
-                    h0 = h1 - dh
-                    node_heads[edge[0]] = h0
+                    h2 = node_heads[edge[1]]
+                    dh = self.get_edge_dh(*edge, edge_rate, h2=h2)
+                    h1 = h2 - dh
+                    node_heads[edge[0]] = h1
                     if self.debug:
-                        print('Step {} - edge {}, h1 {}, h0 {}, rate {}'.format(j, edge, h1, h0, edge_rate))
+                        print('Step {} - edge {}, h2 {}, h1 {}, rate {}'.format(j, edge, h2, h1, edge_rate))
                         print('\t Heads:', {k: v for k, v in node_heads.items() if ~np.isnan(v)})
                         j += 1
 
@@ -585,14 +615,19 @@ class Network:
             for n1 in nx.topological_sort(self.G):
                 for edge in self.G.out_edges(n1):
                     edge_rate = edge_rates[edge]
-                    h0 = node_heads[edge[0]]
-                    h1 = self.get_edge_dh(*edge, edge_rate, h0=h0)
-                    node_heads[edge[1]] = h1
+                    h1 = node_heads[edge[0]]
+                    dh = self.get_edge_dh(*edge, edge_rate, h1=h1)
+                    h2 = h1 + dh
+                    node_heads[edge[1]] = h2
+                    if self.debug:
+                        print('Step {} - edge {}, h2 {}, h1 {}, rate {}'.format(j, edge, h2, h1, edge_rate))
+                        print('\t Heads:', {k: v for k, v in node_heads.items() if ~np.isnan(v)})
+                        j += 1
 
-        return node_rates, edge_rates, node_heads
+        return edge_rates, node_heads
 
 
-    def balance(self, **root_kwargs):
+    def balance(self, head_bc=None, rate_bc=None, mix_bc=None, check=False, **root_kwargs):
         """
         Balance node heads given boundary conditions and flow constraints.
 
@@ -614,6 +649,8 @@ class Network:
         AssertionError
             If boundary conditions are missing.
         """
+        self.set_boundary_conditions(head_bc=head_bc, rate_bc=rate_bc, mix_bc=mix_bc, check=check)
+
         # Initialize head and rate vectors
         Hs = np.zeros(len(self))
 
@@ -644,7 +681,10 @@ class Network:
 
         # Solve for non-head node values
         x0 = Hs[~nodes_head_mask]
-        Hs_sub = root(dummy_error, x0, **root_kwargs).x
+        out = root(dummy_error, x0, **root_kwargs)
+        if self.debug:
+            print(out)
+        Hs_sub = out.x
         Hs[~nodes_head_mask] = Hs_sub
 
         return Hs
@@ -690,13 +730,12 @@ class Network:
             If boundary conditions are missing.
 
         """
-        self.set_boundary_conditions(head_bc=head_bc, rate_bc=rate_bc, mix_bc=mix_bc)
-        node_heads = self.balance(**root_kwargs)
+        node_heads = self.balance(head_bc=head_bc, rate_bc=rate_bc, mix_bc=mix_bc, **root_kwargs)
         edge_rates = self.get_edge_flows(dict(zip(self.nodes, node_heads)))
-        _, node_rates = self.get_node_flows(edge_rates)
+        # _, node_rates = self.get_node_flows(edge_rates)
         if as_dict:
-            return dict(zip(self.nodes, node_rates)), dict(zip(self.edges, edge_rates)), dict(zip(self.nodes, node_heads))
-        return node_rates, edge_rates, node_heads
+            return dict(zip(self.edges, edge_rates)), dict(zip(self.nodes, node_heads))
+        return edge_rates, node_heads
 
 
     def get_head_from_edge_rates(self, edge_rates, end_head=0):

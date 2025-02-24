@@ -124,7 +124,7 @@ def find_friction_factor(re, eD, fanning=True):
 
 
 def single_phase_pressure_gradient(
-    flow_rate, P0=0, D=1, density=1000, viscosity=1e-3, inc=0,
+    flow_rate, *args, D=1, density=1000, viscosity=1e-3, inc=0,
     eps=0.15e-3, compressibility=0, L=1, K=0,
     output_components=False, full_output=False, as_head=False, ):
     """
@@ -134,9 +134,7 @@ def single_phase_pressure_gradient(
     ----------
     flow_rate: float or array(float)
         flow_rate in m3/s
-    P0: float
-        initial pressure (or head). For incompressible fluids, setting a value of P0 can be used to return the end pressure.
-        Default is 0. Ignored if output_components is set to True
+    *args: additional positional arguments. Unused (for compatibility)
     D: float
         diameter in m.
     density: float
@@ -151,7 +149,7 @@ def single_phase_pressure_gradient(
     compressibility: float
         compressibility of fluid in Pa**-1 (default 0)
     L: float
-      length of pipe. Default value 1, which will return the gradient.
+      length of pipe. Setting L= value 1, which will return the gradient.
       For incompressible fluids setting L can be used to obtain the total loss
       Default is 1.
     K: float
@@ -171,6 +169,10 @@ def single_phase_pressure_gradient(
     -------
     float or tuple or dict
         Total gradient or an array of gradients (dPg, dPf, dPv).
+    
+        If P0 is set, returns end pressure
+        If P1 is set, returns the initial pressure
+        If neither is set, returns the pressure difference
     """
     dPg = -inc * L
     A = D**2 / 4 * np.pi
@@ -189,7 +191,9 @@ def single_phase_pressure_gradient(
         dPg *= density * spc.g
         dPf *= density * spc.g
         dPv *= density * spc.g
-    total_loss = dPg + dPf + dPv + P0
+    
+    total_loss = dPg + dPf + dPv
+    
     if full_output:
         return dict(total_loss=total_loss, friction_loss=dPf, gravity_loss=dPg, kinetic_loss= dPv, friction_factor=f, reynolds=re, v=v, eD=eD,)
     elif output_components:
