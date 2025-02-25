@@ -66,11 +66,11 @@ class Network:
         dictionaries as values.
     flow_from_potential : callable, optional
         Function to calculate flow from head difference.
-        It should be of the form lambda Q, h0, **kwargs: h1
+        It should be of the form lambda h1, h2, **kwargs: flow
         (default: `get_Q_from_h`).
     potential_from_flow : callable, optional
         Function to calculate head difference from flow.
-        It should be of the form lambda rate, h0, **kwargs: h1
+        It should be of the form lambda rate, h0, h1, **kwargs: dh
         (default: `get_h_from_Q`).
     debug : bool, optional
         If True, enables debug mode for verbose outputs (default: False).
