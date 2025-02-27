@@ -66,11 +66,11 @@ class Network:
         dictionaries as values.
     flow_from_potential : callable, optional
         Function to calculate flow from head difference.
-        It should be of the form lambda h1, h2, **kwargs: flow
+        It should be of the form lambda h_start, h_end, **kwargs: flow
         (default: `get_Q_from_h`).
     potential_from_flow : callable, optional
         Function to calculate head difference from flow.
-        It should be of the form lambda rate, h0, h1, **kwargs: dh
+        It should be of the form lambda rate, h_start, h_end, **kwargs: dh
         (default: `get_h_from_Q`).
     debug : bool, optional
         If True, enables debug mode for verbose outputs (default: False).
@@ -300,7 +300,7 @@ class Network:
             Ending node of the edge.
         h1 : float
             Start head
-        h0: float
+        h2: float
             End head (default is 0).
         **kwargs: dict(optional)
             additional parameters to be passed to self.get_flow_from_potential.
