@@ -5,7 +5,7 @@ import scipy.constants as spc
 from scipy.optimize import minimize, least_squares
 import warnings
 from typing import List, Dict, Optional, Tuple, Union
-from src.network import Network
+from network import Network
 
 class Optimizer:
     """
@@ -37,8 +37,10 @@ class Optimizer:
     debug: bool = False
  
     def __init__(self, n: Network, edge_params: List[str], default_values: Optional[List[float]] = None,
-                 bounds: Optional[List[Tuple[float, float]]] = None, edges: Optional[List[Tuple[int, int]]] = None,
-                 H0: float = spc.atm):
+                 bounds: Optional[List[Tuple[float, float]]] = None,
+                 edges: Optional[List[Tuple[int, int]]] = None,
+                 use_balance: bool = False,
+                 H0: float = 10):
         if bounds is None or len(bounds) != len(edge_params):
             raise ValueError("Bounds must be provided and match the length of edge_params")
         
@@ -53,6 +55,7 @@ class Optimizer:
         self.edge_params: List[str] = edge_params
         self.default_values: Dict[str, float] = dict(zip(edge_params, default_values))
         self.bounds: Dict[str, Tuple[float, float]] = dict(zip(edge_params, bounds))
+        self.use_balance = use_balance
 
     @property
     def default_X(self) -> np.ndarray:
@@ -70,9 +73,9 @@ class Optimizer:
         return np.array([b for param in self.edge_params for b in self.bounds[param]]).reshape(-1, 2)
 
     @staticmethod
-    def error_func(X1: np.ndarray, X2: Union[float, np.ndarray] = 0) -> float:
-        """Calculates the absolute sum error between two sets of values."""
-        return np.abs(X1 - X2).sum()
+    def cost_func(X1: np.ndarray, X2: Union[float, np.ndarray] = 0) -> float:
+        """Calculates the cost between two sets of values. Defaults to MAE"""
+        return np.abs(X1 - X2).sum() / np.size(X1)
 
     def reset_parameters(self) -> None:
         """Resets all edge parameters to their default values."""
@@ -93,8 +96,9 @@ class Optimizer:
         attrs = {e: {edge_param: v} for e, v in zip(edges, values)}
         nx.set_edge_attributes(self.n.G, attrs)  
 
-    def set_get_heads(self, X: np.ndarray, test_rate: Dict[int, float], head_bc: Optional[Dict[int, float]] = None,
-                       use_balance: bool = False) -> Dict[int, float]:
+    def set_get_heads(self, X: np.ndarray, test_rate: Dict[int, float],
+                      head_bc: Optional[Dict[int, float]] = None,
+                       ) -> Dict[int, float]:
         """
         Sets the edge parameters and computes the node heads.
         """
@@ -102,13 +106,40 @@ class Optimizer:
             param_values = X[i * len(self.edges): (i + 1) * len(self.edges)]
             self.set_edge_params(edge_param, param_values)
         
-        if use_balance:
+        if self.use_balance:
             _, node_heads = self.n.balance_solve(rate_bc=test_rate, head_bc=head_bc, as_dict=True)
         else:
             _, node_heads = self.n.propagate_rates(test_rate, H0=self.H0)
         
         return node_heads
 
+    def get_error(self, X, test_rate, test_head, head_bc=None, output_frame=False):
+        """
+        Calculates the cost function.
+        Inputs:
+        X: values corresponding to params (in order) - see below
+        test_rate: rate dictionary (node: array)
+        test_pressure: pressure_dictionary (node: array)
+        """
+        # get propagated rates
+        node_heads = self.set_get_heads(X, test_rate, head_bc)
+
+        # intersect common nodes
+        common_nodes = set(test_head.keys()).intersection(node_heads.keys())
+
+        # calculate error
+        error = np.array([np.abs(node_heads[node] - test_head[node]) for node in common_nodes])
+
+        # return (dataframe or scalar)
+        if output_frame:
+            out = pd.concat(list(map(pd.Series, (node_heads, test_head, test_rate))), axis=1)
+            out.columns = ['calc_heads', 'test_heads', 'test_rates']
+            out = out.loc[list(common_nodes)]
+            out['error'] = error
+            return out
+
+        return self.cost_func(error)
+    
     def optimize(self, test_rate: Dict[int, float], test_head: Dict[int, float],
                  head_bc: Optional[Dict[int, float]] = None,
                  bounds: Optional[np.ndarray] = None, use_balance: bool = False) -> Optional[dict]:
@@ -118,9 +149,11 @@ class Optimizer:
         
         try:
             result = minimize(
-                self.scalar_cost, X0, args=(test_rate, test_head, head_bc, use_balance), 
+                self.get_error, X0, args=(test_rate, test_head, head_bc, use_balance), 
                 bounds=bounds, **self.minimize_kwargs
             )
+            if self.debug:
+                print(result)
         except Exception as e:
             warnings.warn(f"Optimization failed: {e}")
             return None
