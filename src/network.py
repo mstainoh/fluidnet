@@ -546,7 +546,7 @@ class Network:
         Therefore dh (h0=0) is used
         """
         # Initialize rates and heads
-        node_rates = dict().fromkeys(self.nodes, 0)
+        node_rates = dict().fromkeys(self.nodes, 0.)
         if rate_bc is None:
             rate_bc = self.boundary_conditions['rate']
         node_rates.update(rate_bc)

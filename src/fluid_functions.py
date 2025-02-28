@@ -26,6 +26,12 @@ from scipy import constants as spc
 import functools
 import warnings
 
+def head_to_pressure(head, density=1000, units=spc.bar):
+    return head * density * spc.g / units
+
+def pressure_to_head(pressure, density=1000, units=spc.bar):
+    return pressure * units / (density * spc.g)
+
 def reynolds(v, D, density=1000, viscosity=0.001):
     """
     Calculate the Reynolds number.
@@ -120,7 +126,7 @@ def find_friction_factor(re, eD, fanning=True):
     f[m1] = 16 / re[m1]
     f[m2 | m3] = _chen_approx(re[m2 | m3], eD)
     f[m2] = f[m2] * ((re[m2] - 2e3) + (16 / re[m2]) * (4e3 - re[m2])) / 2e3
-    return f * (1 if fanning else 4) * sgn
+    return f * (1 if fanning else 4)
 
 
 def single_phase_pressure_gradient(
@@ -180,7 +186,7 @@ def single_phase_pressure_gradient(
     v = flow_rate / A
     re = reynolds(v, D, density, viscosity)
     f = find_friction_factor(re=re, eD=eD, fanning=False)
-    dPf = - (f / D * L + K) * v**2 / (2 * spc.g)
+    dPf = - (f / D * L + K) * v**2 / (2 * spc.g) * np.sign(flow_rate)
     Eh = compressibility * v**2 / spc.g
     if np.any(Eh >= 1):
         raise ValueError("Supersonic flow encountered.")
