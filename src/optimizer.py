@@ -125,7 +125,6 @@ class Optimizer:
         """
         self.set_X(X)
         errors = pd.Series()
-        print(test_rates, test_heads)
         for test_rate, test_head in zip(test_rates, test_heads):
             # get propagated rates
             node_heads = self.get_heads(test_rate, head_bc)
