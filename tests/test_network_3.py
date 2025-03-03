@@ -1,3 +1,10 @@
+"""
+verify that rate propagation works (both backwards and forward)
+
+verify that balance_solve works and that it gives results that are equal (or very close to) propagate_rates
+
+verify vector compatibility for rate propagation 
+"""
 from network import Network
 import numpy as np
 
@@ -22,6 +29,7 @@ def test_rate_propagation():
   n.debug=False
   rate_bc = {'a': .02, 'b': .03, 'd': -.015}
   edge_rates, node_heads = n.propagate_rates(rate_bc=rate_bc, H0=0)
+
   print('Test propagation:')
   print('\tEdge rates:', edge_rates)
   print('\tNode heads:', node_heads)
@@ -37,6 +45,7 @@ def test_rate_propagation():
   n.reverse_network()
   rate_bc = {k: -v for k, v in rate_bc.items()}
   edge_rates, node_heads = n.propagate_rates(rate_bc=rate_bc, from_source=False, H0=0)
+
   print('Reversed:')
   print('\tEdge rates:', edge_rates)
   print('\tNode heads:', node_heads)
@@ -52,9 +61,10 @@ def test_rate_propagation():
 # Balance calculation
 # ---------------------------------- #
 
-def test_balance():
+def test_balance(debug=True):
   print('Balance test\n')
   n = test_network()
+  n.debug = debug
   head_bc = {'a': 100, 'b': 90}
   rate_bc = {'f': -.05}
   n.set_boundary_conditions(head_bc=head_bc, rate_bc=rate_bc)
@@ -103,6 +113,17 @@ def test_balance():
 
 
 
+def test_vector(debug=False):
+
+  print('Vector test\n')
+  n = test_network()
+  n.debug=debug
+  rate_bc = {'a': np.array([.1, .1]), 'b': np.array([.2, .3])}
+  H0 = np.array([0,1])
+  edge_rates_2, node_heads_2 =n.propagate_rates(rate_bc=rate_bc, H0=H0)
+  print('Rates:', edge_rates_2)
+  print('HEads:', node_heads_2)
+
 # ---------------------------------- #
 # Run tests
 # ---------------------------------- #
@@ -112,6 +133,9 @@ if __name__ == '__main__':
 
     print(sep)
     n_ = test_balance()
+
+    print(sep)
+    test_vector()
 
     print(sep)
     print('Test succesful')

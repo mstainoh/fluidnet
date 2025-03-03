@@ -605,7 +605,7 @@ class Network:
                     node_heads[edge[0]] = h1
                     if self.debug:
                         print('Step {} - edge {}, h2 {}, h1 {}, rate {}'.format(j, edge, h2, h1, edge_rate))
-                        print('\t Heads:', {k: v for k, v in node_heads.items() if ~np.isnan(v)})
+                        print('\t Heads:', {k: v for k, v in node_heads.items()})
                         j += 1
 
         # Calculate node heads (forward propagation)
