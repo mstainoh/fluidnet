@@ -71,7 +71,8 @@ class Network:
     potential_from_flow : callable, optional
         Function to calculate head difference from flow.
         It should be of the form lambda rate, h_start, h_end, **kwargs: dh
-        (default: `get_h_from_Q`).
+        (default: `get_h_from_Q`): 
+            for simple functions h_start and h_end can be ignored, for complex functions they can be used for numerical integration
     debug : bool, optional
         If True, enables debug mode for verbose outputs (default: False).
     common_parameters : dict, optional
@@ -512,13 +513,13 @@ class Network:
 
         Parameters
         ----------
-        rate_bc : dict
-            Boundary conditions for node flow rates (node: rate). If not provided, 
-            uses the boundary conditions defined in the object.
+        rate_bc : dict or hashable
+            Boundary conditions for node flow rates (node: rate).
+            If the potential_from_flow function supports vector addition, rate values can be vectors as well
         from_source : bool, optional
             If True, propagates rates starting from source nodes (default: True).
             If False, propagates rates starting from sink nodes.
-        H0 : float, optional
+        H0 : float or array, optional
             Initial head (pressure) at the starting or ending node (default: 0).
             If None, skips head calculation.
 
@@ -539,11 +540,6 @@ class Network:
         AssertionError
             If required boundary conditions are missing for sources or sinks.
         
-            
-        NOTE: for "from_source=True", back calculation cannot use initial head (h0) as argument
-
-        The reason is head is propagated backwards. Currently head_from_rate calculation does not support this
-        Therefore dh (h0=0) is used
         """
         # Initialize rates and heads
         node_rates = dict().fromkeys(self.nodes, 0.)

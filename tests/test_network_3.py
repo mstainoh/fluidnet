@@ -7,6 +7,7 @@ verify vector compatibility for rate propagation
 """
 from network import Network
 import numpy as np
+import pandas as pd
 
 if __name__ == '__main__':
    from common import sep, test_network_parameters
@@ -118,9 +119,21 @@ def test_vector(debug=False):
   print('Vector test\n')
   n = test_network()
   n.debug=debug
-  rate_bc = {'a': np.array([.1, .1]), 'b': np.array([.2, .3])}
+  rate_bc = {'a': np.array([.01, .02]), 'b': np.array([.04, .07])}
+  rate_bc2 = pd.DataFrame(rate_bc)
   H0 = np.array([0,1])
-  edge_rates_2, node_heads_2 =n.propagate_rates(rate_bc=rate_bc, H0=H0)
+  success = True
+  try:
+    edge_rates, node_heads =n.propagate_rates(rate_bc=rate_bc, H0=H0)
+    edge_rates_2, node_heads_2 =n.propagate_rates(rate_bc=rate_bc2, H0=H0)
+  except Exception as e:
+     success = False
+  assert success, 'Vector test failed {}'.format(e)
+  print('dict vector test')
+  print('Rates:', edge_rates)
+  print('HEads:', node_heads)
+  print('------')
+  print('dataframe test')
   print('Rates:', edge_rates_2)
   print('HEads:', node_heads_2)
 
