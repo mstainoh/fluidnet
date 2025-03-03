@@ -64,11 +64,11 @@ class Network:
     node_attributes : dict, optional
         A dictionary of node attributes, with node IDs as keys and attribute
         dictionaries as values.
-    flow_from_potential : callable, optional
+    flow_from_potential : callable or None, optional
         Function to calculate flow from head difference.
         It should be of the form lambda h_start, h_end, **kwargs: flow
         (default: `get_Q_from_h`).
-    potential_from_flow : callable, optional
+    potential_from_flow : callable or None, optional
         Function to calculate head difference from flow.
         It should be of the form lambda rate, h_start, h_end, **kwargs: dh
         (default: `get_h_from_Q`): 
@@ -106,12 +106,10 @@ class Network:
 
         if callable(flow_from_potential):
             self.get_flow_from_potential = flow_from_potential
-        else:
-            raise NotImplementedError
         if callable(potential_from_flow):
             self.get_potential_from_flow = potential_from_flow
         else:
-            raise NotImplementedError
+            raise NotImplementedError('potential from flow must be callable')
 
         # Create the graph
         G = nx.DiGraph()
@@ -349,6 +347,7 @@ class Network:
         func_kwargs.update(self.common_parameters)
         func_kwargs.update(self.get_edge_parameters(n1, n2))
         func_kwargs.update(kwargs)
+        assert callable(self.get_potential_from_flow, 'potential_from_flow function not provided or not callable')
         return self.get_potential_from_flow(flow, h1, h2, **func_kwargs)
 
     def get_node_flows(self, edge_flows, nodes=None):
