@@ -347,7 +347,7 @@ class Network:
         func_kwargs.update(self.common_parameters)
         func_kwargs.update(self.get_edge_parameters(n1, n2))
         func_kwargs.update(kwargs)
-        assert callable(self.get_potential_from_flow, 'potential_from_flow function not provided or not callable')
+        assert callable(self.get_potential_from_flow), 'potential_from_flow function not provided or not callable'
         return self.get_potential_from_flow(flow, h1, h2, **func_kwargs)
 
     def get_node_flows(self, edge_flows, nodes=None):
