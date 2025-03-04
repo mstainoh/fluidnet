@@ -6,6 +6,7 @@ from scipy.optimize import minimize, least_squares
 import warnings
 from typing import List, Dict, Optional, Tuple, Union
 from network import Network
+import itertools
 
 class Optimizer:
     """
@@ -23,7 +24,7 @@ class Optimizer:
     default_values : Optional[List[float]], optional
         Default values for the parameters.
     bounds : Optional[List[Tuple[float, float]]], optional
-        Bounds for each parameter.
+        Bounds for each parameter. Should be array of shape (parameters, edges, 2) if edges is provided, or (parameters, 2) otherwise
     edges : Optional[List[Tuple[int, int]]], optional
         List of edges to optimize. Defaults to all edges in the network.
     H0 : float, optional
@@ -32,126 +33,138 @@ class Optimizer:
     
     minimize_kwargs: Dict[str, Union[str, Dict[str, Union[int, bool]]]] = dict(
         method='L-BFGS-B', 
-        options={'maxiter': 10000, 'disp': True}
+        options={'maxiter': 100, 'disp': True}
     )
     debug: bool = False
  
-    def __init__(self, n: Network, edge_params: List[str], default_values: Optional[List[float]] = None,
-                 bounds: Optional[List[Tuple[float, float]]] = None,
-                 edges: Optional[List[Tuple[int, int]]] = None,
-                 use_balance: bool = False,
-                 H0: float = 10):
-        if bounds is None or len(bounds) != len(edge_params):
-            raise ValueError("Bounds must be provided and match the length of edge_params")
-        
-        if default_values is None:
-            default_values = [b[0] for b in bounds]
-        if len(default_values) != len(edge_params):
-            raise ValueError("Default values must match the length of edge_params")
+    def __init__(self, n: Network, edge_params: List[str],
+                bounds: np.ndarray,
+                edges: Optional[List[Tuple[int, int]]] = None,
+                default_values: Optional[List[float]] = None,
+                #use_balance: bool = False,
+                H0: float = 0):
         
         self.n: Network = n
         self.H0: float = H0
-        self.edges: List[Tuple[int, int]] = edges if edges is not None else list(n.edges)
-        self.edge_params: List[str] = edge_params
-        self.default_values: Dict[str, float] = dict(zip(edge_params, default_values))
-        self.bounds: Dict[str, Tuple[float, float]] = dict(zip(edge_params, bounds))
-        self.use_balance = use_balance
+        self.edge_params = edge_params
+        lk = len(edge_params)
 
-    @property
-    def default_X(self) -> np.ndarray:
-        """Returns the default parameter values as a flattened array."""
-        return np.hstack([[self.default_values[param]] * len(self.edges) for param in self.edge_params])
+        bounds = np.asarray(bounds)
+        if edges is not None:
+            self.edges = edges
+            le = len(edges)
 
-    @property
-    def current_X(self) -> np.ndarray:
-        """Returns the current network parameter values as a flattened array."""
-        return np.hstack([[self.n.G.edges[e][param] for e in self.edges] for param in self.edge_params])
-    
-    @property
-    def bound_tuples(self) -> np.ndarray:
-        """Returns the bounds formatted for optimization functions."""
-        return np.array([b for param in self.edge_params for b in self.bounds[param]]).reshape(-1, 2)
+            # basic checks
+            assert len(edges) > 0, "Edges must be provided"
+            assert all(e in n.edges for e in edges), "Edges must be in the network"
+
+            # check bound shape
+            assert bounds.shape == (lk, le, 2), "If edges provided, bounds must be provided and match shape (edge_params, edges, 2) = {},{},2".format(lk, le)
+
+            # check default values shape
+            if default_values is not None:
+                assert np.shape(default_values) == (lk, le), "If edges provided, default values should be shape (edge_params, edges) = ({}, {})".format(lk, le)
+        else:
+            self.edges = n.edges
+            # check bounds shape and resize
+            assert bounds.shape == (lk, 2), "If edges not provided, bounds must be provided and match shape (edge_params, 2) = ({}, 2)".format(lk)
+            bounds = np.repeat(bounds, len(self.edges), axis=0)
+            
+            # check default values shape and resize
+            if default_values is not None:
+                assert np.shape(default_values) == (lk,), "If edges not provided, default values should be shape (edge_params,) = ({})".format(lk)
+                default_values = np.repeat(default_values, len(self.edges), axis=0)
+
+        # create indices for df_bounds and default value: parameter -> from -> to -> values
+        i1, i2 = map(list, zip(*itertools.product(self.edge_params, self.edges)))
+        i2a, i2b = zip(*i2)
+        index = pd.MultiIndex.from_tuples(list(zip(i1, i2a, i2b)), names=['param', 'from', 'to'])
+
+        # bounds
+        self.bounds = pd.DataFrame(bounds.reshape(-1, 2), index=index, columns=['lb', 'ub'])
+
+        if default_values is None:
+            default_values = np.array([[n.edges[e][k] for e in self.edges] for k in self.edge_params], dtype=float).ravel()
+        self.default_values = pd.Series(default_values, index=self.bounds.index)
 
     @staticmethod
     def cost_func(X1: np.ndarray, X2: Union[float, np.ndarray] = 0) -> float:
         """Calculates the cost between two sets of values. Defaults to MAE"""
-        return np.abs(X1 - X2).sum() / np.size(X1)
+        er = np.nan_to_num(np.abs(X1 - X2).sum(), 0) / np.count_nonzero(~np.isnan(X1))
+        while len(er.shape):
+            er = er.sum()
+        return er
 
+#%%  edge parameter manipulation
     def reset_parameters(self) -> None:
         """Resets all edge parameters to their default values."""
-        for edge_param, value in self.default_values.items():
-            self.set_edge_params(edge_param, value, edges=self.edges)
+        for edge_param in self.edge_params:
+            self.set_edge_params(edge_param, self.default_values.loc[edge_param].values)
 
-    def set_edge_params(self, edge_param: str, values: Union[float, np.ndarray],
-                        edges: Optional[List[Tuple[int, int]]] = None) -> None:
+    def set_edge_params(self, edge_param: str, values: Union[float, np.ndarray]) -> None:
         """Assigns new values to specified edge parameters."""
-        if edges is None:
-            edges = self.edges
-        
+
+        edges = self.edges
         if np.isscalar(values):
             values = np.repeat(values, len(edges))
         elif len(values) != len(edges):
             raise ValueError("Values array length must match the number of edges")
+        else:
+            pass
         
         attrs = {e: {edge_param: v} for e, v in zip(edges, values)}
         nx.set_edge_attributes(self.n.G, attrs)  
     
     def set_X(self, X: np.ndarray) -> None:
-        """Sets the edge parameters to the values in X."""
-        for i, edge_param in enumerate(self.edge_params):
-            param_values = X[i * len(self.edges): (i + 1) * len(self.edges)]
-            self.set_edge_params(edge_param, param_values)
+        """Unfolds X to set edge parameter values"""
+        X = np.asarray(X).reshape(len(self.edge_params), -1)
+        for arr, edge_param in zip(X, self.edge_params):
+            self.set_edge_params(edge_param, arr)
 
-    def get_heads(self,test_rate: Dict[int, float],
-                      head_bc: Optional[Dict[int, float]] = None,
-                       ) -> Dict[int, float]:
+class PropagationOptimizer(Optimizer):
+#%%  edge parameter manipulation
+    def get_heads(self, test_rate: dict, H0=None) -> Dict[int, float]:
         """
         computes the node heads.
         """
-        if self.use_balance:
-            _, node_heads = self.n.balance_solve(rate_bc=test_rate, head_bc=head_bc, as_dict=True)
-        else:
-            _, node_heads = self.n.propagate_rates(test_rate, H0=self.H0)
+        if H0 is None:
+            H0 = self.H0
+        _, node_heads = self.n.propagate_rates(test_rate, H0=self.H0)
         
         return node_heads
 
-    def get_error(self, X, test_rates, test_heads, head_bc=None, output_frame=False):
+    def get_error(self, X, test_rates: dict, test_heads: pd.core.frame.DataFrame=None, H0=None, output_frame=False):
         """
         Calculates the cost function.
         Inputs:
-        X: values corresponding to params (in order) - see below
-        test_rate: list of rate dictionary (node: array)
-        test_pressure: list of pressure_dictionary (node: array)
+        X: values corresponding to params (in order)
+        test_rate: DataFrame
+        test_heads: DataFrame
         """
-        self.set_X(X)
-        errors = pd.Series()
-        for test_rate, test_head in zip(test_rates, test_heads):
-            # get propagated rates
-            node_heads = self.get_heads(test_rate, head_bc)
+        if X is not None:
+            self.set_X(X)
 
-            # intersect common nodes
-            common_nodes = list(set(test_head.keys()).intersection(node_heads.keys()))
+        calc_heads = pd.DataFrame(self.get_heads(test_rates))
+        calc_heads = calc_heads[test_heads.columns]
+        if test_heads is None:
+            test_heads = calc_heads.copy() * 0
+        errors = calc_heads - test_heads
 
-            # calculate error
-            error = pd.Series(node_heads).loc[common_nodes] - pd.Series(test_head).loc[common_nodes]
-            errors = errors.add(error.abs(), fill_value=0)
-            
         # return (dataframe or scalar)
         if output_frame:
-            return errors
+            return calc_heads - test_heads
 
-        return self.cost_func(errors)
+        return self.cost_func(calc_heads, test_heads)
     
-    def optimize(self, test_rates: List[Dict[int, float]], test_heads: List[Dict[int, float]],
-                 head_bc: Optional[Dict[int, float]] = None,
-                 bounds: Optional[np.ndarray] = None, use_balance: bool = False) -> Optional[dict]:
+    def optimize(self, test_rates: pd.core.frame.DataFrame, test_heads: pd.core.frame.DataFrame) -> Optional[dict]:
         """Runs the optimization process to fit edge parameters."""
-        X0: np.ndarray = self.current_X
-        bounds = bounds if bounds is not None else self.bound_tuples
+        X0: np.ndarray = self.default_values.values
+        bounds = self.bounds.values
+        test_rates = {k: test_rates[k].values for k in test_rates.columns}
         
         try:
             result = minimize(
-                self.get_error, X0, args=(test_rates, test_heads, head_bc, use_balance), 
+                self.get_error, X0, args=(test_rates, test_heads), 
                 bounds=bounds, **self.minimize_kwargs
             )
             if self.debug:
