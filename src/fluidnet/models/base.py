@@ -22,10 +22,12 @@ class FlowHeadModel(ABC):
         """
         raise NotImplementedError
     
-    def start_head_from_end_and_flow(self, rate, h_end, **kwargs):
+    def start_head_from_end_and_flow(self, rate, h_end=None, **kwargs):
+        h_end = h_end or 0
         return h_end - self.head_difference_from_flow(rate, **kwargs)
 
-    def end_head_from_start_and_flow(self, rate, h_start, **kwargs):
+    def end_head_from_start_and_flow(self, rate, h_start=None, **kwargs):
+        h_start = h_start or 0
         return h_start + self.head_difference_from_flow(rate, **kwargs)
 
     def __call__(self, rate=None, h_start=None, h_end=None, **kwargs):

@@ -135,8 +135,9 @@ def find_friction_factor(re, eD: float, fanning: bool=False):
 
 def single_phase_pressure_gradient(
     flow_rate, D: float=1, density: float=1000, viscosity: float=1e-3,
-    inc: float=0, dz: Optional[float] = None,
-    eps: float=0.15e-3, compressibility: float=0, L=1, K=0, f=None,
+    inc: float=0,
+    eps: float=0.15e-3, compressibility: float=0, 
+    L=1, K=0, f=None,
     output_components=False, full_output=False, as_head=False, ):
     """
     Calculate the pressure gradient or pressure difference for single-phase fluid flow.
@@ -173,7 +174,7 @@ def single_phase_pressure_gradient(
       Otherwise returns the sum.
       Default is False
     full_output: bool
-        if True, returns dictionary of intermediate calculations. Default is False.
+        if True, returns dictionary of intermediate calculations (used for debugging). Default is False.
     as_head: bool
       if True, returns the pressure drop as head (m), otherwise in Pa. 
       Default is False.
@@ -188,7 +189,7 @@ def single_phase_pressure_gradient(
         If neither is set, returns the pressure difference
     """
     # gravity loss
-    dz = dz or -inc * L
+    dz = -inc * L
     dPg = -dz * np.sign(flow_rate)
 
     # friction loss
