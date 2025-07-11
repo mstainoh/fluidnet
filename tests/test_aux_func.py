@@ -20,7 +20,7 @@ def test_params():
   viscosity = 0.001
   flow_rate = np.array([360 / spc.hour, 10 / spc.hour])
   L = 100
-  inc=0
+  inc=0.1
   K=0
   names = 'eps', 'D', 'density', 'viscosity', 'flow_rate', 'L', 'inc', 'K'
   values = eps, D, density, viscosity, flow_rate, L, inc, K
@@ -38,7 +38,7 @@ def test_inverse():
 
   # inverse function
   print('Inverse test:')
-  print('Q:', Q)
+  print('Input rate:', Q)
   print('dh:', dh_true)
   Q2 = get_Q_from_h(dh_true, **params)
   print('Back calculated rate:', Q2)
@@ -75,7 +75,7 @@ def test_fit():
   print()
 
   assert np.isclose(eps_true, eps_match, rtol=1e-3), 'eps match not working'
-  assert np.isclose(K_true, K_match, rtol=1e-3), 'K match not working'
+  assert np.isclose(K_true, K_match, atol=1e-3), 'K match not working'
   return
 
 # ---------------------------------- #

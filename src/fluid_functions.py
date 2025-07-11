@@ -1,8 +1,36 @@
 # src/fluid_functions.py
+"""
+Fluid dynamics functions for calculating various fluid flow parameters.
+
+This module includes functions to calculate Reynolds number, Froude number,
+friction factor, and pressure gradient for single-phase fluid flow.
+
+Functions
+---------
+reynolds(v, D, density=1000, viscosity=0.001)
+    Calculate the Reynolds number.
+froid(v, D)
+    Calculate the Froude number.
+_chen_approx(re, eD)
+    Chen approximation for turbulent friction factor.
+find_friction_factor(re, eD, fanning=True)
+    Calculate the friction factor for fluid flow.
+single_phase_pressure_gradient(flow_rate, D, density=1000, viscosity=1e-3, inc=0,
+                               eps=0.15e-3, compressibility=0, L=1, K=0,
+                               output_components=False, as_head=False)
+    Calculate the pressure gradient for single-phase fluid flow.
+"""
+
 import numpy as np
 from scipy import constants as spc
 import functools
 import warnings
+
+def head_to_pressure(head, density=1000, units=spc.bar):
+    return head * density * spc.g / units
+
+def pressure_to_head(pressure, density=1000, units=spc.bar):
+    return pressure * units / (density * spc.g)
 
 def reynolds(v, D, density=1000, viscosity=0.001):
     """
@@ -98,22 +126,23 @@ def find_friction_factor(re, eD, fanning=True):
     f[m1] = 16 / re[m1]
     f[m2 | m3] = _chen_approx(re[m2 | m3], eD)
     f[m2] = f[m2] * ((re[m2] - 2e3) + (16 / re[m2]) * (4e3 - re[m2])) / 2e3
-    return f * (1 if fanning else 4) * sgn
+    return f * (1 if fanning else 4)
 
 
 def single_phase_pressure_gradient(
-    flow_rate, D, density=1000, viscosity=1e-3, inc=0,
+    flow_rate, *args, D=1, density=1000, viscosity=1e-3, inc=0,
     eps=0.15e-3, compressibility=0, L=1, K=0,
-    output_array=False, as_head=False):
+    output_components=False, full_output=False, as_head=False, ):
     """
-    Calculate the pressure gradient for single-phase fluid flow.
+    Calculate the pressure gradient or pressure difference for single-phase fluid flow.
 
     Parameters
     ----------
     flow_rate: float or array(float)
         flow_rate in m3/s
+    *args: additional positional arguments. Unused (for compatibility)
     D: float
-        diameter in m
+        diameter in m.
     density: float
         fluid density in kg/m3
     viscosity: float
@@ -126,24 +155,30 @@ def single_phase_pressure_gradient(
     compressibility: float
         compressibility of fluid in Pa**-1 (default 0)
     L: float
-      length of pipe. Default value 1 will return the gradient.
+      length of pipe. Setting L= value 1, which will return the gradient.
       For incompressible fluids setting L can be used to obtain the total loss
       Default is 1.
     K: float
       additional pressure loss factors for elbows, valve, etc.
       Default is 0.
-    output_array: bool
+    output_components: bool
       if True, returns the three components of pressure loss (gravity gradient, friction gradient, momentum gradient).
       Otherwise returns the sum.
       Default is False
+    full_output: bool
+        if True, returns dictionary of intermediate calculations. Default is False.
     as_head: bool
       if True, returns the pressure drop as head (m), otherwise in Pa. 
       Default is False.
 
     Returns
     -------
-    float or tuple
-        Total gradient or an array of gradients.
+    float or tuple or dict
+        Total gradient or an array of gradients (dPg, dPf, dPv).
+    
+        If P0 is set, returns end pressure
+        If P1 is set, returns the initial pressure
+        If neither is set, returns the pressure difference
     """
     dPg = -inc * L
     A = D**2 / 4 * np.pi
@@ -151,7 +186,7 @@ def single_phase_pressure_gradient(
     v = flow_rate / A
     re = reynolds(v, D, density, viscosity)
     f = find_friction_factor(re=re, eD=eD, fanning=False)
-    dPf = - (f / (2 * D) * L + K) * v**2 / spc.g
+    dPf = - (f / D * L + K) * v**2 / (2 * spc.g) * np.sign(flow_rate)
     Eh = compressibility * v**2 / spc.g
     if np.any(Eh >= 1):
         raise ValueError("Supersonic flow encountered.")
@@ -162,8 +197,14 @@ def single_phase_pressure_gradient(
         dPg *= density * spc.g
         dPf *= density * spc.g
         dPv *= density * spc.g
-    if output_array:
-        return dPg, dPf, dPv
-    return dPg + dPf + dPv
+    
+    total_loss = dPg + dPf + dPv
+    
+    if full_output:
+        return dict(total_loss=total_loss, friction_loss=dPf, gravity_loss=dPg, kinetic_loss= dPv, friction_factor=f, reynolds=re, v=v, eD=eD,)
+    elif output_components:
+        return (dPg, dPf, dPv)
+    else:
+        return total_loss
 
 single_phase_head_gradient = functools.partial(single_phase_pressure_gradient, as_head=True)
