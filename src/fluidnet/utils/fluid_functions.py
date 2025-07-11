@@ -21,6 +21,7 @@ single_phase_pressure_gradient(flow_rate, D, density=1000, viscosity=1e-3, inc=0
     Calculate the pressure gradient for single-phase fluid flow.
 """
 
+from typing import Optional
 import numpy as np
 from scipy import constants as spc
 import functools
@@ -32,7 +33,7 @@ def head_to_pressure(head, density=1000, units=spc.bar):
 def pressure_to_head(pressure, density=1000, units=spc.bar):
     return pressure * units / (density * spc.g)
 
-def reynolds(v, D, density=1000, viscosity=0.001):
+def reynolds(v, D:float, density:float=1000, viscosity:float=0.001):
     """
     Calculate the Reynolds number.
 
@@ -99,7 +100,7 @@ def _chen_approx(re, eD):
     ) ** -2
 
 
-def find_friction_factor(re, eD, fanning=True):
+def find_friction_factor(re, eD: float, fanning: bool=False):
     """
     Calculate the friction factor for fluid flow.
 
@@ -110,14 +111,17 @@ def find_friction_factor(re, eD, fanning=True):
     eD : float
         Relative roughness (epsilon/D).
     fanning : bool, optional
-        True to return Fanning friction factor, False for Darcy-Weisbach (default: True).
+        True to return Fanning friction factor, False for Darcy-Weisbach (default is False).
 
     Returns
     -------
     float or array-like
         Friction factor.
+    
+    Note: it accepts positive or negative reynolds (the latter correspond to negative flow), 
+    but the friction factor is always positive
     """
-    sgn = np.sign(re)
+    #sgn = np.sign(re)
     re = np.abs(re)
     f = np.zeros_like(re, dtype=np.float64)
     m1 = (re > 1e-10) & (re <= 2000)
@@ -130,8 +134,9 @@ def find_friction_factor(re, eD, fanning=True):
 
 
 def single_phase_pressure_gradient(
-    flow_rate, *args, D=1, density=1000, viscosity=1e-3, inc=0,
-    eps=0.15e-3, compressibility=0, L=1, K=0,
+    flow_rate, D: float=1, density: float=1000, viscosity: float=1e-3,
+    inc: float=0, dz: Optional[float] = None,
+    eps: float=0.15e-3, compressibility: float=0, L=1, K=0, f=None,
     output_components=False, full_output=False, as_head=False, ):
     """
     Calculate the pressure gradient or pressure difference for single-phase fluid flow.
@@ -140,15 +145,15 @@ def single_phase_pressure_gradient(
     ----------
     flow_rate: float or array(float)
         flow_rate in m3/s
-    *args: additional positional arguments. Unused (for compatibility)
     D: float
         diameter in m.
     density: float
         fluid density in kg/m3
     viscosity: float
         fluid viscosity in Pa.s (default 1)
-    inc: float between -1 (full downwards) and 1 (full upwards). 
-        NOTE: if L is set, simply setting inc = dz / L will add the height (dz) component 
+    inc: float 
+        inclination (dz/dl) between -1 (full downwards) and 1 (full upwards) - in the direction of positive flow. 
+        NOTE: for incompressible fluids, can be calculated as: inc = dz / L, where dz is the total height difference
         Default is 0
     eps: float
         pipe roughness in m (default 0.15 mm)
@@ -161,6 +166,8 @@ def single_phase_pressure_gradient(
     K: float
       additional pressure loss factors for elbows, valve, etc.
       Default is 0.
+    f: (optional) float or None: 
+        friction factor. If not given, it will be calculated based on viscosity and pipe roughness. Default is None.
     output_components: bool
       if True, returns the three components of pressure loss (gravity gradient, friction gradient, momentum gradient).
       Otherwise returns the sum.
@@ -173,35 +180,45 @@ def single_phase_pressure_gradient(
 
     Returns
     -------
-    float or tuple or dict
+    float or dict
         Total gradient or an array of gradients (dPg, dPf, dPv).
     
         If P0 is set, returns end pressure
         If P1 is set, returns the initial pressure
         If neither is set, returns the pressure difference
     """
-    dPg = -inc * L
+    # gravity loss
+    dz = dz or -inc * L
+    dPg = -dz * np.sign(flow_rate)
+
+    # friction loss
     A = D**2 / 4 * np.pi
-    eD = eps / D
     v = flow_rate / A
     re = reynolds(v, D, density, viscosity)
-    f = find_friction_factor(re=re, eD=eD, fanning=False)
+    if f is None:
+        eD = eps / D
+        f = find_friction_factor(re=re, eD=eD, fanning=False)
     dPf = - (f / D * L + K) * v**2 / (2 * spc.g) * np.sign(flow_rate)
+
+    # velocity loss
     Eh = compressibility * v**2 / spc.g
     if np.any(Eh >= 1):
         raise ValueError("Supersonic flow encountered.")
     elif np.any(Eh > 0.9):
         warnings.warn("Flow is close to supersonic.")
     dPv = (dPf + dPg) * Eh / (1 - Eh)
+
+    # adjustments for head
     if not as_head:
         dPg *= density * spc.g
         dPf *= density * spc.g
         dPv *= density * spc.g
     
+    # total loss
     total_loss = dPg + dPf + dPv
     
     if full_output:
-        return dict(total_loss=total_loss, friction_loss=dPf, gravity_loss=dPg, kinetic_loss= dPv, friction_factor=f, reynolds=re, v=v, eD=eD,)
+        return dict(result=total_loss, friction_loss=dPf, gravity_loss=dPg, kinetic_loss= dPv, friction_factor=f, reynolds=re, v=v)
     elif output_components:
         return (dPg, dPf, dPv)
     else:

@@ -31,7 +31,7 @@ __all__ = ['Network', 'get_h_from_Q', 'get_Q_from_h']
 
 import pickle
 from aux_func import inverse_function
-from fluid_functions import single_phase_head_gradient
+from src.fluidnet.equations.fluid_functions import single_phase_head_gradient
 import networkx as nx
 import numpy as np
 import warnings

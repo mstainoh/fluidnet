@@ -1,0 +1,52 @@
+import numpy as np
+from fluidnet.utils.fluid_functions import single_phase_pressure_gradient
+from scipy.optimize import brentq
+from fluidnet.models.base import FlowHeadModel
+
+def inverse_pressure_gradient_auto(dh_target, highlimit=1e8, **kwargs):
+    # Handle vector input via recursion
+    if np.shape(dh_target):  # shape is non-empty → array-like
+        return np.array([inverse_pressure_gradient_auto(dh, **kwargs) for dh in dh_target])
+
+    def f(rate):
+        return single_phase_pressure_gradient(rate, **kwargs) - dh_target
+
+    # Start with reasonable guess
+    rate_low = 1e-6
+    rate_high = 1
+
+    # Expand upper bound until f(rate_low) and f(rate_high) have opposite signs
+    f_low = f(rate_low)
+    f_high = f(rate_high)
+
+    while np.sign(f_low) == np.sign(f_high):
+        rate_high *= 100
+        rate_low /= 10
+        f_high = f(rate_high)
+        if rate_high > highlimit:  # safety escape to prevent infinite loop
+            raise RuntimeError("Failed to bracket root for pressure gradient.")
+
+    return brentq(f, rate_low, rate_high)
+
+class DarcyWeisbachModel(FlowHeadModel):
+    def __init__(self, **default_params):
+        self.default_params = default_params
+
+    def head_difference_from_flow(self, rate, **kwargs):
+        """
+        Given flow rate and one head, compute the other.
+        If both heads are None, return head difference.
+        """
+        params = dict(self.default_params)
+        params.update(kwargs)
+        dh = single_phase_pressure_gradient(rate, **params)
+        return dh  # head drop
+
+    def flow_from_heads(self, h_start, h_end, **kwargs):
+        """
+        Given head difference, compute flow rate.
+        """
+        dh = h_end - h_start
+        params = dict(self.default_params)
+        params.update(kwargs)
+        return inverse_pressure_gradient_auto(dh, **params)

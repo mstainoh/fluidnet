@@ -1,5 +1,5 @@
 
-from fluid_functions import reynolds, find_friction_factor, single_phase_pressure_gradient
+from fluidnet.utils.fluid_functions import reynolds, find_friction_factor, single_phase_pressure_gradient
 import numpy as np
 import scipy.constants as spc
 
