@@ -1,4 +1,0 @@
-- Refactorizar root finding para que la inversa simplemente use  root_scalar (multi uso), verificar signature
-- OBJETO NETWORK
-- modelo integracion numerica
-- probar objeto network
