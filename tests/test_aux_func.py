@@ -1,5 +1,5 @@
 
-from fluid_functions import single_phase_head_gradient
+from fluidnet.fluid_functions import single_phase_head_gradient
 import numpy as np
 from aux_func import inverse_function, fit_parameter
 import scipy.constants as spc

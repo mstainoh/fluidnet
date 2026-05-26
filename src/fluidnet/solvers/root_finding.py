@@ -24,7 +24,6 @@ import numpy as np
 
 __all__ = ['brent_inverse', 'newton_inverse']
 
-
 def brent_inverse(
     y, func,
     low, high,
@@ -92,8 +91,8 @@ def brent_inverse(
 
 def newton_inverse(
     y, func, low, high,
-    maxiter=50, tol=1e-8,
     fallback=True,
+    newton_parameters=dict(),
     **kwargs
 ):
     """
@@ -111,12 +110,8 @@ def newton_inverse(
             Lower bound used for fallback bracketing or initial guess.
         high : float
             Upper bound used for fallback bracketing or initial guess.
-        maxiter : int, default=50
-            Maximum number of iterations for Newton’s method.
-        tol : float, default=1e-8
-            Tolerance for convergence.
         fallback : bool, default=True
-            Whether to fall back to Brent’s method if Newton fails.
+            Whether to fall back to Brent's method if Newton fails.
         **kwargs :
             Additional arguments passed to `func`.
 
@@ -130,7 +125,7 @@ def newton_inverse(
     if np.ndim(y):
         return np.array([
             newton_inverse(yy, func, low, high,
-                           maxiter=maxiter, tol=tol,
+                           newton_parameters=newton_parameters,
                            fallback=fallback, **kwargs)
             for yy in y
         ])
@@ -140,8 +135,8 @@ def newton_inverse(
 
     try:
         guess = (low + high) / 2
-        return newton(f, x0=guess, maxiter=maxiter, tol=tol)
+        return newton(f, x0=guess, **newton_parameters)
     except (RuntimeError, OverflowError):
         if not fallback:
             raise
-        return brentq(f, low, high, xtol=tol)
+        return brentq(f, low, high)

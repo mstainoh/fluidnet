@@ -29,101 +29,41 @@ from scipy.optimize import root
 __all__ = ['Network', 'get_h_from_Q', 'get_Q_from_h']
 """
 
+from typing import List, Optional
+from fluidnet.network_objects import Node, Pipe, Edge
+from fluidnet.models.base import FlowHeadModel
+
 import pickle
-from aux_func import inverse_function
-from src.fluidnet.equations.fluid_functions import single_phase_head_gradient
 import networkx as nx
 import numpy as np
 import warnings
 from scipy.optimize import root
 
-__all__ = ['Network', 'get_h_from_Q', 'get_Q_from_h']
-
-# Define default flow and head functions
-get_h_from_Q = single_phase_head_gradient
-
-def get_Q_from_h(h1, h2=0, **kwargs):
-    dh = h2 - h1
-    finv = inverse_function(get_h_from_Q, x0=0, bracket=[-1e8, 1e8], vectorize=True)
-    return finv(dh, **kwargs)
+__all__ = ['Network']
 
 class Network:
-    """
-    Represents a fluid flow network with nodes and edges.
-
-    This class allows calculations of flows and heads within a directed graph
-    where edges represent pipes or connections with associated parameters
-    (e.g., resistance, length, etc.), and nodes represent junctions or points
-    in the network.
-
-    Parameters
-    ----------
-    edges : list of tuples
-        Each tuple is (node1, node2, edge_data), where edge_data is a dictionary
-        of parameters (e.g., length, diameter).
-    node_attributes : dict, optional
-        A dictionary of node attributes, with node IDs as keys and attribute
-        dictionaries as values.
-    flow_from_potential : callable or None, optional
-        Function to calculate flow from head difference.
-        It should be of the form lambda h_start, h_end, **kwargs: flow
-        (default: `get_Q_from_h`).
-    potential_from_flow : callable or None, optional
-        Function to calculate head difference from flow.
-        It should be of the form lambda rate, h_start, h_end, **kwargs: dh
-        (default: `get_h_from_Q`): 
-            for simple functions h_start and h_end can be ignored, for complex functions they can be used for numerical integration
-    debug : bool, optional
-        If True, enables debug mode for verbose outputs (default: False).
-    common_parameters : dict, optional
-        Common parameters shared across all edges (e.g., fluid density, viscosity).
-    
-    Note: if a parameter is both in the edge and in the common_parameters, the former will override the latter
-    Note: flow_from_potential and potential_from_flow should have the same **kwargs
-
-    Attributes
-    ----------
-    G : networkx.DiGraph
-        Directed graph representation of the network.
-    boundary_conditions : dict
-        Stores head and flow boundary conditions for nodes.
-    debug : bool
-        Debug mode state.
-    common_parameters : dict
-        Common parameters shared across edges.
-    """
-
+    @staticmethod
+    def graph_from_pipes(pipes: List[Pipe]) -> nx.DiGraph:
+        G = nx.DiGraph()
+        for pipe in pipes:
+            G.add_edge(*pipe.as_tuple(), **pipe.parameters)
+        return G
+        
     def __init__(
-        self, edges=[], node_attributes=dict(), 
-        flow_from_potential=get_Q_from_h, 
-        potential_from_flow=get_h_from_Q,
-        debug=False, common_parameters=dict()
+        self, pipes: List[Pipe]=[], 
+        model: Optional[FlowHeadModel] = None,
+        boundary_conditions: Optional[dict] = None
     ):
-        self.common_parameters = dict(common_parameters)
 
-        ermsg = 'at least 1 of flow_from_potential or potential_from_flow must be callable'
-        assert callable(flow_from_potential) or callable(potential_from_flow), ermsg  
-
-        if callable(flow_from_potential):
-            self.get_flow_from_potential = flow_from_potential
-        if callable(potential_from_flow):
-            self.get_potential_from_flow = potential_from_flow
-        else:
-            raise NotImplementedError('potential from flow must be callable')
 
         # Create the graph
-        G = nx.DiGraph()
-        for e in edges:
-            i, j, edge_data = e
-            G.add_edge(i, j, **edge_data)
-        for node, node_data in node_attributes.items():
-            G.nodes[node].update(node_data)
-        self.G = G
+        self.G = self.graph_from_pipes(pipes)
+        self.model = model
 
-        self.boundary_conditions = dict()
-        self.debug = debug
+        self.boundary_conditions = boundary_conditions
 
-    # %% save - load methods
+    # %% -------------------
+    # save - load methods
     def save(self, filename):
         """
         Saves the graph
@@ -132,10 +72,10 @@ class Network:
         filename (str or Path): The path to the file where the object will be saved.
         """
         with open(filename, 'wb') as file:
-            pickle.dump(self.G, file)
+            pickle.dump(self, file)
     
     @classmethod
-    def load(cls, filename, **kwargs):
+    def load(cls, filename):
         """
         Loads the Graph and creates a network from it.
 
@@ -147,16 +87,11 @@ class Network:
         Network: The loaded Network object.
         """
         with open(filename, 'rb') as file:
-            G = pickle.load(file)
-        return cls.from_graph(G, **kwargs)
-    
-    @staticmethod
-    def from_graph(G, **kwargs):
-        n = Network(**kwargs) 
-        n.G = G
-        return n
+            return pickle.load(file)
 
-    # %% basic methods
+
+    # %% --------------
+    # Boilerplate methods
     def reverse_network(self):
         """
         Reverse the direction of the entire network.
@@ -216,6 +151,8 @@ class Network:
         """
         return self.G.get_edge_data(n1, n2)
 
+    # %% -------------------
+    # Topological methods
     def get_source_nodes(self):
         """
         Get nodes with no incoming edges.
@@ -227,7 +164,7 @@ class Network:
         """
         return [n for n, d in self.G.in_degree() if d == 0]
 
-    def get_sink_nodes(self):
+    def get_sink_nodes(self) -> List:
         """
         Get nodes with no outgoing edges.
 
@@ -238,7 +175,7 @@ class Network:
         """
         return [n for n, d in self.G.out_degree() if d == 0]
 
-    def get_middle_nodes(self):
+    def get_middle_nodes(self) -> List:
         """
         Get nodes that are neither sources nor sinks.
 
@@ -251,7 +188,7 @@ class Network:
         sinks = set(self.get_sink_nodes())
         return list(set(self.nodes).difference(sources).difference(sinks))
 
-    def is_single_outflow(self):
+    def is_single_outflow(self) -> np.bool:
         """
         Check if all nodes have at most one outgoing edge.
 
@@ -262,7 +199,7 @@ class Network:
         """
         return (np.fromiter((self.G.out_degree(i) for i in self.G.nodes()), int) <= 1).all()
 
-    def is_single_inflow(self):
+    def is_single_inflow(self) -> np.bool:
         """
         Check if all nodes have at most one incoming edge.
 
@@ -273,20 +210,8 @@ class Network:
         """
         return (np.fromiter((self.G.in_degree(i) for i in self.G.nodes()), int) <= 1).all()
 
-    def get_common_parameters(self):
-        """
-        Get common parameters used for edge_flow.
-
-        Returns
-        -------
-        dict
-            Common parameters (copy).
-        
-        Note: returns a copy. Use self.common_parameters to get the reference to the actual dictionary.
-        """
-        return dict(self.common_parameters)
-
-    # %% basic calculations
+    # %% -------------------
+    # basic calculations
     def get_edge_flow(self, n1, n2, h1, h2=0, **kwargs):
         """
         Calculate the flow for a given edge and head difference.
