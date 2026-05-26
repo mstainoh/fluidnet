@@ -1,3 +1,6 @@
+"""
+verify set_boundary_conditions method
+"""
 from network import Network
 import warnings
 
@@ -42,7 +45,6 @@ def test_bc():
   assert n.boundary_conditions['rate'] == rate_bc, 'rate bc not set correctly'
   #assert n.boundary_conditions['mix'] == {}, 'mix bc not set correctly'
   return
-
 
 # ---------------------------------- #
 # run tests

@@ -1,0 +1,37 @@
+[project]
+name = "fluidnet"
+version = "0.1.0"
+description = "A scientific tool for modeling and solving fluid networks."
+readme = "README.md"
+requires-python = ">=3.8"
+
+authors = [
+  { name = "Marcelo Stainoh", email = "mstainoh@gmail.com" }
+]
+
+license = { text = "MIT" }
+
+dependencies = [
+  "numpy==2.2.1",
+  "scipy==1.14.1",
+  "networkx==3.4.2",
+  "colorama==0.4.6"
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest==8.3.4",
+  "black",
+  "ruff",
+  "mypy"
+]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
