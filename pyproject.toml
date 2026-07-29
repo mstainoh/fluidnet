@@ -1,30 +1,40 @@
 [project]
 name = "fluidnet"
-version = "0.1.0"
-description = "A scientific tool for modeling and solving fluid networks."
+version = "0.2.0.dev0"
+description = "Graph-first steady-state fluid network simulation with polymorphic rates and pluggable loss functions."
 readme = "README.md"
-requires-python = ">=3.8"
-
-authors = [
-  { name = "Marcelo Stainoh", email = "mstainoh@gmail.com" }
+requires-python = ">=3.10"
+authors = [{ name = "Marcelo Stainoh", email = "mstainoh@gmail.com" }]
+license = { text = "MIT" }
+keywords = ["fluid-networks", "hydraulics", "pipe-flow", "networkx", "simulation"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Science/Research",
+  "Topic :: Scientific/Engineering",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
 ]
 
-license = { text = "MIT" }
-
 dependencies = [
-  "numpy==2.2.1",
-  "scipy==1.14.1",
-  "networkx==3.4.2",
-  "colorama==0.4.6"
+  "numpy>=1.26,<3",
+  "scipy>=1.11",
+  "networkx>=3.0",
+  "pandas>=2.0",
 ]
 
 [project.optional-dependencies]
 dev = [
-  "pytest==8.3.4",
-  "black",
+  "pytest>=8",
+  "pytest-cov",
   "ruff",
-  "mypy"
+  "mypy",
 ]
+
+[project.urls]
+Repository = "https://github.com/mstainoh/fluidnet"
+Issues = "https://github.com/mstainoh/fluidnet/issues"
 
 [build-system]
 requires = ["setuptools>=61.0"]
@@ -35,3 +45,17 @@ package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.mypy]
+strict = true
