@@ -5,21 +5,28 @@
 swap that goes numerically unnoticed when roughness << diameter. Keyword-only
 arguments make that class of bug impossible.
 """
-
 import numpy as np
 
-#: Typical absolute roughness [m] by pipe material.
-ROUGHNESS_VALUES = {
-    "Cast Iron": 0.26e-3,
-    "Galvanized Iron": 0.15e-3,
-    "Asphalted Cast Iron": 0.12e-3,
-    "Commercial or Welded Steel": 0.045e-3,
-    "PVC, Glass, Other Drawn Tubing": 0.0015e-3,
-}
+from fluidnet.physics.types import ArrayLike
 
 
-def _chen_approx(re, D, eps):
-    """Chen (1979) explicit approximation for turbulent Fanning friction."""
+def _chen_approx(re: ArrayLike, D: ArrayLike, eps: ArrayLike) -> ArrayLike:
+    """Chen (1979) explicit approximation for turbulent Fanning friction.
+
+    Parameters
+    ----------
+    re : ArrayLike
+        Reynolds number.
+    D : ArrayLike
+        Pipe diameter [m].
+    eps : ArrayLike
+        Absolute roughness [m], same units as ``D``.
+
+    Returns
+    -------
+    ArrayLike
+        Fanning friction factor (turbulent correlation).
+    """
     re = np.clip(re, 2e3, None)
     return (
         -4
@@ -30,7 +37,12 @@ def _chen_approx(re, D, eps):
     ) ** -2
 
 
-def friction_factor(re, *, D, eps, fanning=True):
+def friction_factor(
+        re: ArrayLike, *,
+        D: ArrayLike,
+        eps: ArrayLike,
+        fanning: bool = True
+        ) -> ArrayLike:
     """Friction factor for pipe flow. Vectorized over ``re``.
 
     Laminar (``re <= 2000``): ``16 / re``. Turbulent (``re >= 4000``): Chen
@@ -38,15 +50,21 @@ def friction_factor(re, *, D, eps, fanning=True):
 
     Parameters
     ----------
-    re : float or array_like
+    re : ArrayLike
         Reynolds number (must be >= 0).
-    D : float
+    D : ArrayLike
         Pipe diameter [m]. Keyword-only.
-    eps : float
+    eps : ArrayLike
         Absolute roughness [m], same units as ``D``. Keyword-only.
     fanning : bool, optional
         Return Fanning factor (default). ``False`` returns Darcy-Weisbach
         (``f_DW = 4 * f_Fanning``).
+
+    Returns
+    -------
+    ArrayLike
+        Friction factor (Fanning by default, Darcy-Weisbach if
+        ``fanning=False``).
     """
     re = np.asarray(re, dtype=float)
     if np.any(re < 0):

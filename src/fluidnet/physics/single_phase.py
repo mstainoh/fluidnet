@@ -1,54 +1,42 @@
 """Single-phase (incompressible or mildly compressible) pressure gradient."""
 
 import warnings
-from typing import NamedTuple
 
 import numpy as np
-import scipy.constants as SPC
+import scipy.constants as spc
 
 from .dimensionless import reynolds
 from .friction import friction_factor
-
-
-class GradientResult(NamedTuple):
-    """Pressure gradient decomposition [Pa/m], flow-direction sign convention.
-
-    Supports tuple unpacking: ``total, dpg, dpf, dpv = result``.
-    """
-
-    total: float
-    gravity: float
-    friction: float
-    momentum: float
+from .types import ArrayLike, GradientResult
 
 
 def single_phase_gradient(
-    mass_rate,
-    D,
-    density,
-    viscosity,
+    mass_rate: ArrayLike,
+    D: ArrayLike,
+    density: ArrayLike,
+    viscosity: ArrayLike,
     *,
-    inclination=0.0,
-    roughness=1.5e-4,
-    compressibility=0.0,
+    inclination: ArrayLike = 0.0,
+    roughness: ArrayLike = 1.5e-4,
+    compressibility: ArrayLike = 0.0,
 ) -> GradientResult:
     """Adiabatic single-phase pressure gradient in a constant-diameter pipe.
 
     Parameters
     ----------
-    mass_rate : float or array_like
+    mass_rate : ArrayLike
         Mass rate [kg/s]. Negative values mean reversed flow.
-    D : float
+    D : ArrayLike
         Pipe diameter [m].
-    density : float or array_like
+    density : ArrayLike
         Fluid density [kg/m3].
-    viscosity : float or array_like
+    viscosity : ArrayLike
         Dynamic viscosity [Pa.s].
-    inclination : float, optional
+    inclination : ArrayLike, optional
         ``sin(angle)``, in ``[-1, 1]``. Default 0 (horizontal).
-    roughness : float, optional
+    roughness : ArrayLike, optional
         Absolute roughness [m]. Default 0.15 mm.
-    compressibility : float, optional
+    compressibility : ArrayLike, optional
         Fluid compressibility [1/Pa]. Default 0 (incompressible).
 
     Returns
@@ -65,7 +53,7 @@ def single_phase_gradient(
     if not (np.all(inclination >= -1) and np.all(inclination <= 1)):
         raise ValueError("inclination must satisfy -1 <= inc <= 1")
 
-    dpg = -SPC.g * inclination * density
+    dpg = -spc.g * inclination * density
 
     area = np.pi * D**2 / 4
     v = np.abs(mass_rate) / (density * area)
@@ -81,4 +69,4 @@ def single_phase_gradient(
         warnings.warn("Flow is close to supersonic", stacklevel=2)
     dpv = (dpf + dpg) * eh / (1 - eh)
 
-    return GradientResult(dpg + dpf + dpv, dpg, dpf, dpv)
+    return GradientResult(dpg, dpf, dpv)
