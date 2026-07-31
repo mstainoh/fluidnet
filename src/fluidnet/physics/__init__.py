@@ -12,17 +12,17 @@ Pressure gradients are expressed *in the direction of positive flow*:
 **negative** for positive rates, and positive for negative (reversed) rates.
 """
 
-from .dimensionless import reynolds, froude, mach
-from .friction import friction_factor, ROUGHNESS_VALUES
-from .single_phase import single_phase_gradient, GradientResult
+from .dimensionless import froude, mach, reynolds
+from .friction import friction_factor
 from .multiphase import beggs_brill_gradient
+from .single_phase import single_phase_gradient
+from .types import GradientResult
 
 __all__ = [
     "reynolds",
     "froude",
     "mach",
     "friction_factor",
-    "ROUGHNESS_VALUES",
     "single_phase_gradient",
     "beggs_brill_gradient",
     "GradientResult",

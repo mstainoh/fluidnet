@@ -1,0 +1,6 @@
+#: Typical absolute roughness [m] by pipe material.
+"Cast Iron": 0.26e-3
+"Galvanized Iron": 0.15e-3
+"Asphalted Cast Iron": 0.12e-3
+"Commercial or Welded Steel": 0.045e-3
+"PVC, Glass, Other Drawn Tubing": 0.0015e-3
