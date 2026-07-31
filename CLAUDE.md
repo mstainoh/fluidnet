@@ -92,3 +92,40 @@ Result (contrato de salida, solo lo produce el solver)
 - `docs/session-log.md` — bitácora de sesiones, más reciente arriba.
 - `legacy-0.1` (branch) — prototipo viejo, código a rescatar (ver mapa de
   rescate en el ADR de arquitectura), no a extender directamente.
+## Tipado (housekeeping, no arquitectura)
+
+**Esta sección tiene precedencia sobre "Cómo trabajar §2" para errores de
+mypy.** Los errores de tipado (`no-any-return`, `no-untyped-def`,
+`import-untyped`, `arg-type` por float/array) son mecánicos, no decisiones
+de diseño. No pares a preguntar ni greppees tests/docs antes de tipar —
+aplicá directo:
+
+- `ArrayLike` vive en `fluidnet/physics/types.py`. Importalo de ahí; no
+  redefinas el alias por módulo ni uses `numpy.typing.ArrayLike` (es laxo,
+  pensado para inputs).
+- Funciones que devuelven `ArrayLike` con expresión aritmética numpy →
+  `cast(ArrayLike, expr)` en el return.
+- Parámetros sin anotar → anotá con el tipo obvio del uso (`float`,
+  `ArrayLike`, etc.), sin buscar la firma "perfecta".
+- Nivel funcional, no exhaustivo: no hace falta `@overload` ni generics
+  finos. `float | npt.NDArray[np.float64]` alcanza.
+
+**Excepciones — acá SÍ pará y preguntá** (son contrato, no housekeeping):
+
+- `_beggs_brill_detailed`: firma escalar a propósito hasta v0.5. No la
+  toques — ver `test_detailed_scalar_contract_today` y el
+  `xfail(strict=True)` que es su spec de roadmap.
+- Campos de `GradientResult`: pasar `float` → `ArrayLike` cambia el
+  contrato de retorno de toda la capa physics. Decisión de diseño abierta.
+
+## Entorno (resuelto, no re-investigar)
+
+- Paquete tipado PEP 561: `py.typed` en `src/fluidnet/`, empaquetado vía
+  `[tool.setuptools.package-data]`, con `packages`/`mypy_path` fijados en
+  `[tool.mypy]`.
+- Comando de chequeo canónico: **`python -m mypy`** (sin argumentos). No
+  usar paths sueltos (`mypy src/...`): dan falsos `import-untyped` por el
+  editable install. Si aparece uno, el problema es la invocación, no el
+  código.
+- scipy: `ignore_missing_imports` vía override en `pyproject.toml`. No
+  instalar `scipy-stubs`.

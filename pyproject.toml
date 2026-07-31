@@ -30,6 +30,7 @@ dev = [
   "pytest-cov",
   "ruff",
   "mypy",
+  "fluids>=1.3",
 ]
 
 [project.urls]
@@ -42,6 +43,10 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
+
+[tool.setuptools.package-data]
+fluidnet = ["py.typed"]
+"fluidnet.physics" = ["data/*.yaml"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -59,3 +64,9 @@ select = ["E", "F", "I", "UP", "B"]
 
 [tool.mypy]
 strict = true
+packages = ["fluidnet"]
+mypy_path = "src"
+
+[[tool.mypy.overrides]]
+module = "scipy.*"
+ignore_missing_imports = true
