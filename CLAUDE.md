@@ -72,6 +72,12 @@ Result (contrato de salida, solo lo produce el solver)
   "arreglar" un test rojo; es rojo a propósito hasta que se implemente.
 - Golden tests: preferir literatura (Kermit Brown ej. 4.7) sobre valores
   pinneados de `fluids` cuando ambos estén disponibles.
+- **Tests de comportamiento vectorial** (`test_flowmap_vectorized`,
+  `test_detailed_scalar_contract_today`, `test_detailed_vectorized_over_rates`
+  xfail) viven en `tests/physics/test_multiphase_vector_1.py`, archivo
+  separado — **no** en `test_multiphase_golden.py` como decía originalmente
+  la ADR §3.3. Decisión tomada en sesión de código 2026-07-31; ADR
+  actualizada en la misma sesión.
 
 ## Cómo trabajar en una sesión de código
 
@@ -90,8 +96,12 @@ Result (contrato de salida, solo lo produce el solver)
 - `docs/design/` — ADRs de arquitectura detallada (`architecture-v0.2.md`,
   `physics-single-multiphase.md`).
 - `docs/session-log.md` — bitácora de sesiones, más reciente arriba.
+- `tests/physics/test_multiphase_vector_1.py` — batería de tests de
+  comportamiento vectorial (flowmap, contrato escalar, xfail de roadmap
+  v0.5). Ver nota en "Convenciones de testing" arriba.
 - `legacy-0.1` (branch) — prototipo viejo, código a rescatar (ver mapa de
   rescate en el ADR de arquitectura), no a extender directamente.
+
 ## Tipado (housekeeping, no arquitectura)
 
 **Esta sección tiene precedencia sobre "Cómo trabajar §2" para errores de

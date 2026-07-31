@@ -89,22 +89,38 @@ Tres archivos, cada uno con un rol distinto — no son redundantes:
 - `fluids` vive en `[project.optional-dependencies].dev` — oráculo de
   validación, nunca dependencia de runtime.
 
-### 3.3 Comportamiento de arrays (dentro de `test_multiphase_golden.py`)
+### 3.3 Comportamiento de arrays (`test_multiphase_vector_1.py`)
+
+Archivo separado de `test_multiphase_golden.py`: golden testea corrección
+física (valores contra literatura/oráculo), este archivo testea el
+*contrato de forma* (qué soporta arrays y qué no) — son preocupaciones
+distintas, no redundancia. Recorre las funciones de `beggs_brill.py` en el
+orden en que están definidas en el módulo (flowmap → holdup → detailed →
+`beggs_brill_gradient`).
 
 - `test_flowmap_vectorized`: `beggs_brill_flowmap` con arrays de 5 puntos,
   regímenes verificados uno por uno contra los boundaries L1–L4.
 - `test_flowmap_rejects_out_of_domain`: NaN debe levantar `ValueError`
   (falsea todas las máscaras); `Cl=0` **no** sirve como probe porque cae en
   la máscara distributed.
-- `test_detailed_vectorized_over_rates`: **`xfail(strict=True)`** — spec
-  ejecutable del comportamiento deseado en v0.5 (rates vectorizados →
-  gradientes vectorizados). Falla hoy a propósito; el día que se
-  implemente el broadcasting, este test **pasa** y el `strict=True` pone la
-  suite en rojo como recordatorio de sacar el marker y pinnear valores
-  reales.
-- `test_detailed_scalar_contract_today`: fija el contrato actual (escalar
-  entra, floats salen) para no dejar que un array 0-d se filtre al
-  `GradientResult` en un estado semi-vectorizado.
+- `test_holdup_vectorized_within_regime` (parametrizado en `i` 0–3):
+  `_holdup` sí vectoriza sobre `Cl`/`NFr`/`Nlv` para un régimen fijo
+  (`angle` se mantiene escalar — un caño, no un ángulo por punto). No
+  estaba documentado en versiones previas de este ADR.
+- `test_detailed_rejects_array_rates` / `test_gradient_rejects_array_rates`:
+  documentan la causa concreta del contrato escalar — el chequeo de
+  co/counter-flow (`if liquid_mass_rate > 0 and ...`) es ambiguo para
+  arrays de más de un elemento y levanta `ValueError`.
+- `test_detailed_vectorized_over_rates` / `test_gradient_vectorized_over_rates`:
+  **`xfail(strict=True)`** — spec ejecutable del comportamiento deseado en
+  v0.5 (rates vectorizados → gradientes vectorizados), a nivel interno y
+  público. Fallan hoy a propósito; el día que se implemente el
+  broadcasting, estos tests **pasan** y el `strict=True` pone la suite en
+  rojo como recordatorio de sacar el marker y pinnear valores reales.
+- `test_detailed_scalar_contract_today` / `test_gradient_scalar_contract_today`:
+  fijan el contrato actual (escalar entra, floats salen) para no dejar que
+  un array 0-d se filtre al `GradientResult` en un estado
+  semi-vectorizado.
 
 ---
 
