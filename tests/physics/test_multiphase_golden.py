@@ -1,12 +1,16 @@
 """Golden tests for Beggs & Brill against published results."""
 
+import logging
+
 import numpy as np
 import scipy.constants as SPC
 
 from fluidnet.physics.multiphase import _beggs_brill_detailed
 
+logger = logging.getLogger(__name__)
 
-def test_kermit_brown_example_4_7():
+
+def test_kermit_brown_example_4_7() -> None:
     """Example 4.7, Kermit Brown. Book reports Darcy-Weisbach f (= 4 * Fanning)."""
     qos = 10000 * SPC.barrel / SPC.day
     qgs = 10e6 * SPC.foot**3 / SPC.day
@@ -55,18 +59,37 @@ def test_kermit_brown_example_4_7():
         "fNs": (0.0155 / 4, 0.08),  # book reads f from a Moody chart
         "liquid_holdup": (0.530, 0.05),
     }
+
+    logger.info("flow_regime: calc=%s book=intermittent", calc["flow_regime"])
     assert calc["flow_regime"] == "intermittent"
+
     for key, (expected, tol) in book.items():
         rel_err = abs(calc[key] - expected) / expected
+        logger.info(
+            "%s: calc=%.5g book=%.5g rel_err=%.4f (tol=%.2f)",
+            key, calc[key], expected, rel_err, tol,
+        )
         assert rel_err < tol, f"{key}: got {calc[key]:.5g}, book {expected:.5g}"
 
     dpg_book = 28 * SPC.psi / 144 / SPC.foot
     dpf_book = 1.17 * SPC.psi / 144 / SPC.foot
-    assert abs(-calc["gradient"].gravity - dpg_book) / dpg_book < 0.05
-    assert abs(-calc["gradient"].friction - dpf_book) / dpf_book < 0.10
+
+    gravity_err = abs(-calc["gradient"].gravity - dpg_book) / dpg_book
+    logger.info(
+        "gradient.gravity: calc=%.5g book=%.5g rel_err=%.4f (tol=0.05)",
+        -calc["gradient"].gravity, dpg_book, gravity_err,
+    )
+    assert gravity_err < 0.05
+
+    friction_err = abs(-calc["gradient"].friction - dpf_book) / dpf_book
+    logger.info(
+        "gradient.friction: calc=%.5g book=%.5g rel_err=%.4f (tol=0.10)",
+        -calc["gradient"].friction, dpf_book, friction_err,
+    )
+    assert friction_err < 0.10
 
 
-def test_checalc_case_no_payne():
+def test_checalc_case_no_payne() -> None:
     """checalc.com Beggs & Brill sample (no Payne correction)."""
     calc = _beggs_brill_detailed(
         4.75 / SPC.hour * 613.8,
@@ -81,6 +104,15 @@ def test_checalc_case_no_payne():
         sigma=28.0,
         payne_correction=False,
     )
-    # sanity: vertical upflow, gradient must be a loss; holdup in (Cl, 1)
+
+    logger.info(
+        "gradient.total=%.5g (expected < 0, vertical upflow)",
+        calc["gradient"].total,
+    )
     assert calc["gradient"].total < 0
+
+    logger.info(
+        "liquid_fraction=%.5g liquid_holdup=%.5g (expected Cl < Hl <= 1)",
+        calc["liquid_fraction"], calc["liquid_holdup"],
+    )
     assert calc["liquid_fraction"] < calc["liquid_holdup"] <= 1
