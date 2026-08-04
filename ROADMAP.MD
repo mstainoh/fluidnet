@@ -44,8 +44,11 @@ del resto del paquete.
 **Contrato de la capa (importante para lo que sigue).** `physics` es un
 evaluador **puntual de gradiente**: entra un estado local en escalares SI, sale
 `GradientResult` en **Pa/m**. No conoce `Rate`, ni longitud de edge, ni
-dirección de propagación. Todo lo que sea integración sobre la cañería,
-adaptación de firma o diagnósticos pertenece a la capa `loss_func`, no acá.
+dirección de propagación, ni si su resultado se va a integrar o a
+multiplicar por `L`. El régimen (`AlgebraicLoss` vs. `IntegralLoss`) es
+decisión de `loss_func`, no algo que `physics` declare o infiera. Todo lo
+que sea integración sobre la cañería, adaptación de firma o diagnósticos
+pertenece a la capa `loss_func`, no acá.
 
 **Freeze — con una distinción.** Se congelan las **correlaciones empíricas**
 (B&B, modelos de holdup): no se agregan hasta v0.5. El diferencial del proyecto
@@ -83,9 +86,11 @@ No es un producto todavía; es la prueba estructural.
   2. **integrar el gradiente sobre la longitud del edge** (`Pa/m` → `Pa`;
      trivial para incompresible: `grad.total * L`),
   3. aplicar `@diagnostic` (f, Re, v al canal lateral).
-  `darcy_weisbach` fija `compressibility=0` en v0.2 — con compresibilidad el
-  término de momento depende de P y la física deja de ser algebraica (pasa a
-  `IntegralLoss`, v2). El mismo `physics` sirve a los dos protocolos sin cambios.
+  `darcy_weisbach` cubre fluidos incompresibles en v0.2 — `compressibility=0`
+  es la *consecuencia* de ese alcance, no una decisión de configuración que
+  `darcy_weisbach` tome. Con compresibilidad != 0 el término de momento
+  depende de P y la física deja de ser algebraica (pasa a `IntegralLoss`,
+  v2). El mismo `physics` sirve a los dos protocolos sin cambios.
 - Tests del core (los de physics, ~20, ya son el piso) + un notebook demo:
   wellfield sintético.
 - README con statement of need explícito vs. pandapipes / WNTR.
@@ -203,9 +208,29 @@ tag `v1.0`.
 - **MVP de 26 tests: declarado perdido y superado.** No se busca más. La spec de
   reconstrucción es `docs/design/architecture-v0.2.md` + este roadmap; los ~20
   tests de physics son el piso real.
+- **Firma de `physics/`: keyword-only completo** (ver `CLAUDE.md` decisión
+  cerrada #10). Toda función de gradiente es enteramente kw-only, sin
+  excepción por cantidad de rates — necesario para que `loss_func` pueda
+  despachar genéricamente (`gradient_fn(**kwargs)` filtrado por
+  `signature`) sin ramificar por modelo.
+- **Caudal negativo / dirección de flujo: no es feature de `physics`.**
+  `beggs_brill_gradient`/`single_phase_gradient` no interpretan signo de
+  caudal como sentido de flujo; la dirección la resuelve el integrador
+  aguas arriba invirtiendo el sentido de integración (`solve_ivp` con
+  `t_span=(L, 0)` en vez de `(0, L)`), no un caso especial dentro de
+  `physics` ni de `loss_func`. Cierra la ambigüedad que dejaba abierta la
+  rama de "flujo reverso" de `_beggs_brill_detailed` (ver
+  `physics-single-multiphase.md` §2).
 
 ### Abiertas
 
+- **Discriminador `AlgebraicLoss`/`IntegralLoss` no inspeccionable desde la
+  firma.** Es un valor de runtime (`compressibility == 0`), no una
+  propiedad estática de la firma de `loss_func` — contradice la lectura
+  inicial de "despacho por `signature`" (ver `architecture-v0.2.md` §2.2,
+  que sí aplica para el filtrado de kwargs, pero no para esto). Abierto: si
+  el régimen lo declara el usuario al registrar la loss (coherente con
+  "ningún solver adivina") o si se chequea en runtime.
 - **Firma de `Rate`/`ScalarRate`** — bloqueante del MVP (ver secuencia §1).
   Sub-decisiones: alcance del estado (cinemática sola vs. cinemática +
   propiedades vs. cinemática + composición con propiedades derivadas); quién es

@@ -18,6 +18,21 @@
   mismo contrato — comparten `GradientResult` con `multiphase`, lo que
   permite que un solver trate ambos casos de forma uniforme aguas abajo.
 
+**`compressibility` es estado, no flag.** Es β = (1/ρ)(∂ρ/∂P)_T en 1/Pa,
+una propiedad física del fluido — no un switch que activa o desactiva un
+modo de cálculo. Entra en el término de aceleración (momentum) vía
+`dP/dx = (grav + fric) / (1 − ρv²β)`: `β = 0` es el valor físico exacto de
+un líquido incompresible, no una aproximación ni un caso especial. En
+`beggs_brill_gradient` el parámetro hoy llamado `mix_compressibility` es el
+mismo concepto para la mezcla (ponderada por holdup) — el plan es que
+termine siendo el mismo nombre que en `single_phase_gradient`
+(`compressibility`), a propósito, para que el futuro adaptador `Rate` →
+`physics` pueda emitir una sola clave sin ramificar por modelo; unificar el
+nombre sigue **abierto** (ver `session-log.md` 2026-08-04). (Ver también la
+nota sobre régimen algebraico/integral en `architecture-v0.2.md` §2.2:
+`compressibility == 0` es justamente el discriminador de runtime entre los
+dos protocolos de loss.)
+
 **Testing**: golden tests contra casos de libro/referencia (mismo patrón que
 `multiphase`, ver §3). 11 tests pasando entre los cuatro módulos de physics
 (`dimensionless`, `friction`, `single_phase`, `multiphase`) al momento de
@@ -32,16 +47,27 @@ y `test_multiphase_vs_fluids.py`.
 líquido-gas, cualquier inclinación. Único modelo multifásico implementado
 hoy — ver §4 para lo que falta.
 
-**API pública**: `beggs_brill_gradient(...) -> GradientResult`. Firma en SI
-estricto (kg/s, kg/m³, Pa·s, m), con `sigma` como única excepción histórica
-(dyn/cm, no N/m — a revisar si se corrige antes de v0.2 o se documenta como
-deuda).
+**API pública**: `beggs_brill_gradient(*, ...) -> GradientResult`. Firma en
+SI estricto (kg/s, kg/m³, Pa·s, m, N/m para `sigma` — ver §4), enteramente
+keyword-only (`CLAUDE.md` decisión cerrada #10).
 
-**API interna**: `_beggs_brill_detailed(...) -> dict` — mismo cálculo más
-intermedios (`NFr`, `Cl`, `liquid_holdup`, `ReNs`, `f`, `fNs`,
-`mixture_density`, `flow_regime`). Es lo que consumen los tests y,
-eventualmente, el canal `@diagnostic`. No es parte del contrato público —
-ningún solver debería importar `_beggs_brill_detailed` directamente.
+**Precondición de signo (decisión de diseño 2026-08-04, implementación
+pendiente)**: `liquid_mass_rate >= 0` y `gas_mass_rate >= 0`, con
+`ValueError` fuera de ese rango — reemplaza la rama actual de "flujo
+reverso" (`liquid_mass_rate <= 0 and gas_mass_rate <= 0` → `abs()` +
+inclinación invertida). `beggs_brill_gradient`/`_beggs_brill_detailed` no
+conocen la orientación del edge; la dirección de flujo no es una feature de
+`physics`, la resuelve el integrador aguas arriba (`solve_ivp` con
+`t_span=(L, 0)` en vez de `(0, L)` — ver `ROADMAP.md` §Decisiones cerradas).
+`loss_func` es quien adapta el signo antes de llamar a `physics`, no al
+revés.
+
+**API interna**: `_beggs_brill_detailed(*, ...) -> dict` — mismo cálculo
+más intermedios (`NFr`, `Cl`, `liquid_holdup`, `ReNs`, `f`, `fNs`,
+`mixture_density`, `flow_regime`). Misma firma kw-only que la pública. Es
+lo que consumen los tests y, eventualmente, el canal `@diagnostic`. No es
+parte del contrato público — ningún solver debería importar
+`_beggs_brill_detailed` directamente.
 
 **Contrato de forma (hoy)**: **escalar únicamente**. `int(flowmap(...))`
 fuerza escalar en `_beggs_brill_detailed`, igual que los `if` de `_holdup` y
@@ -137,9 +163,11 @@ orden en que están definidas en el módulo (flowmap → holdup → detailed →
   Cl alto). Documentado como desviación intencional, no discrepancia.
 - **Payne correction**: solo en fluidnet; `fluids` no la tiene — todos los
   tests cross-validation la desactivan (`payne_correction=False`).
-- **Unidad de `sigma`**: dyn/cm en la firma de fluidnet vs. N/m en
-  `fluids` — conversión explícita en los tests (`sigma * 1e-3`). Candidato
-  a unificar a SI (N/m) antes de cerrar la firma pública de `Rate`.
+- **Unidad de `sigma` — cerrada.** SI estricto (N/m), no dyn/cm. Pendiente:
+  sacar la conversión `sigma * 1e-3` de `test_multiphase_vs_fluids.py` (los
+  casos `GOLDEN` están en N/m nativo ahora; `fluids` sigue esperando N/m
+  también, así que el `* 1e-3` que compensaba el dyn/cm de fluidnet queda
+  sin sentido y hay que borrarlo, no solo ajustarlo).
 - **Vectorización**: no implementada (`_beggs_brill_detailed` es escalar);
   `beggs_brill_flowmap` sí. Ver roadmap v0.5 (broadcasting `pd.Series`).
 

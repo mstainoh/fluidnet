@@ -69,6 +69,10 @@ loss_func(rate: Rate, p_boundary: float, **edge_attrs, **network_attrs) -> float
 ```
  
 Ambos declarados como `typing.Protocol` explícitos (`AlgebraicLoss`, `IntegralLoss`). Convención de signos heredada y confirmada: `dp = p_downstream − p_upstream` (pérdida → negativo). Kwargs extra absorbidos con `**kwargs` — el patrón de mineplanner de "declarar solo lo que usás" funciona bien y se mantiene.
+
+Consecuencia directa de que `physics/` sea enteramente keyword-only (`CLAUDE.md` decisión #10): `loss_func` puede despachar hacia la función de gradiente correcta filtrando sus propios kwargs por `inspect.signature(gradient_fn).parameters` en vez de necesitar un adaptador por modelo. `physics` tampoco conoce la orientación del edge — es `loss_func` quien adapta signo/dirección (caudal, inclinación) antes de invocar la función de gradiente; la dirección de integración en sí la resuelve el solver (`t_span` de `solve_ivp`), no `physics` ni `loss_func`.
+
+**El discriminador `AlgebraicLoss`/`IntegralLoss` no es inspeccionable desde la firma.** A diferencia del despacho de kwargs de arriba (que sí lee de `signature`), qué protocolo aplica es un valor de *runtime* — `compressibility == 0` (o `mix_compressibility == 0` en B&B) — no una propiedad estática de la firma de `loss_func` ni de `gradient_fn`. **Abierto**: si el régimen lo declara el usuario explícitamente al registrar la loss (coherente con "ningún solver adivina", ver §2.4) o si se chequea en runtime a partir del valor de compresibilidad.
  
 **Diagnósticos vía decorador** — la solución al conflicto "contrato escalar estricto vs. resultado rico":
  

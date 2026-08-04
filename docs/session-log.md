@@ -25,6 +25,79 @@
 
 ---
 
+## 2026-08-04 — diseño
+
+**Cerrado:**
+
+- **Firmas de `physics/`: keyword-only completo.** Toda función de
+  gradiente (`single_phase_gradient`, `beggs_brill_gradient`,
+  `_beggs_brill_detailed`) enteramente kw-only, sin excepción por cantidad
+  de rates. Razón: `loss_func` despacha genéricamente
+  (`gradient_fn(**kwargs)` filtrado por `signature`); una firma que varía
+  de forma entre modelos obliga a ramificar en el consumidor. Añadida como
+  `CLAUDE.md` decisión cerrada #10.
+- **Política de defaults en `physics/`.** Defaults solo en flags de modelo
+  (`payne_correction`, `compressibility`, `holdup_adj`); nunca en estado
+  físico (`roughness`, `inclination`, `sigma`, densidades, viscosidades) —
+  un default físico es una hipótesis de modelado invisible.
+- **`sigma` a SI (N/m).** Cierra la deuda documentada en
+  `physics-single-multiphase.md` §4; queda pendiente sacar la conversión
+  `sigma * 1e-3` de `test_multiphase_vs_fluids.py` (ver "Abierto").
+- **Precondición de signo en `beggs_brill_gradient`/`_beggs_brill_detailed`.**
+  `liquid_mass_rate >= 0` y `gas_mass_rate >= 0`, `ValueError` fuera de
+  rango — reemplaza la rama de "flujo reverso" actual (`abs()` + inclinación
+  invertida).
+- **Dirección de flujo resuelta por el integrador, no por `physics`.**
+  Caudal negativo no es un caso a soportar en `physics` ni en `loss_func`;
+  el sentido de integración se invierte en el solver (`solve_ivp` con
+  `t_span=(L, 0)` en vez de `(0, L)`).
+- Docs sincronizadas con estas decisiones: `CLAUDE.md` (#10 + nota de
+  excepción de tipado sobre `_beggs_brill_detailed`),
+  `physics-single-multiphase.md` (§2, §4), `ROADMAP.md` (Decisiones
+  cerradas), `architecture-v0.2.md` (§2.2).
+- **`compressibility` es estado, no flag.** β = (1/ρ)(∂ρ/∂P)_T en 1/Pa,
+  entra en el término de momento vía
+  `dP/dx = (grav + fric) / (1 − ρv²β)`; `β = 0` es el valor físico exacto
+  de un líquido incompresible, no una aproximación. Documentado en
+  `physics-single-multiphase.md` §1, con nota de que el nombre compartido
+  con `mix_compressibility` (B&B) es intencional pero la unificación en sí
+  sigue abierta (ver más abajo).
+- **`physics` no conoce el régimen algebraico/integral** — corolario
+  explícito del contrato de capa cero: tampoco sabe si su resultado se va
+  a integrar o a multiplicar por `L`; esa decisión es de `loss_func`.
+  Añadido a `ROADMAP.md` → Capa 0.
+- **Higiene**: `ROADMAP.md` (scope MVP) ya no dice que `darcy_weisbach`
+  "fija `compressibility=0`" como si fuera una decisión de configuración —
+  v0.2 cubre fluidos incompresibles y `β = 0` es la consecuencia de ese
+  alcance, no algo que la función decida.
+
+**Abierto:**
+
+- Implementación: el código de `_beggs_brill_detailed` todavía tiene la
+  rama de flujo reverso (`liquid_mass_rate <= 0 and gas_mass_rate <= 0`);
+  falta reemplazarla por la precondición `ValueError` recién cerrada. La
+  firma kw-only en sí ya está aplicada en código (`single_phase.py`,
+  `multiphase/beggs_brill.py`) y tests actualizados.
+- Sacar la conversión `sigma * 1e-3` de `test_multiphase_vs_fluids.py`.
+- Unificar nombre `compressibility` (single-phase) vs.
+  `mix_compressibility` (Beggs & Brill) — mismo concepto, nombre distinto;
+  molesta para el despacho genérico por `signature` que motiva la decisión
+  kw-only.
+- Definir una función de estado (qué agrupa densidad/viscosidad/sigma antes
+  de llegar a `physics`, probablemente parte del diseño de `Rate`).
+- `Rate.as_physics_kwargs()` (o nombre similar) como adaptador: método que
+  traduce un `Rate` + atributos de edge a los kwargs exactos que espera
+  cada función de gradiente — es lo que necesita `loss_func` para el
+  despacho genérico por `signature` mencionado arriba.
+
+**Próximo paso:**
+
+- Sesión de código: implementar la precondición de signo en
+  `_beggs_brill_detailed` (reemplazar la rama de flujo reverso) y sacar la
+  conversión `sigma * 1e-3` de los tests de cross-validation.
+
+---
+
 ## 2026-07-31 — código
 
 **Cerrado:**

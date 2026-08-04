@@ -57,6 +57,17 @@ Result (contrato de salida, solo lo produce el solver)
 9. **Versionado**: `version = "0.2.0.dev0"` no cambia durante desarrollo
    activo. Solo se bumpea a `0.2.0` en el momento del release, con
    `git tag -a v0.2` + `git push origin v0.2` explícito.
+10. **Firmas de `physics/`: keyword-only completo.** Toda función de
+    gradiente (`single_phase_gradient`, `beggs_brill_gradient`,
+    `_beggs_brill_detailed`) es enteramente kw-only, sin excepción por
+    cantidad de rates (monofásico 1 rate, B&B 2). Razón: `loss_func`
+    despacha genéricamente (`gradient_fn(**kwargs)` filtrado por
+    `signature`); cualquier variación de forma entre modelos obligaría a
+    ramificar en el consumidor. Corolario sobre defaults: solo van en
+    flags de modelo (`payne_correction`, `compressibility`, `holdup_adj`),
+    nunca en estado físico (`roughness`, `inclination`, `sigma`,
+    densidades, viscosidades) — un default físico es una hipótesis de
+    modelado invisible.
 
 ## Convenciones de testing (capa physics)
 
@@ -124,7 +135,10 @@ aplicá directo:
 
 - `_beggs_brill_detailed`: firma escalar a propósito hasta v0.5. No la
   toques — ver `test_detailed_scalar_contract_today` y el
-  `xfail(strict=True)` que es su spec de roadmap.
+  `xfail(strict=True)` que es su spec de roadmap. Excepción dentro de la
+  excepción: pasar sus parámetros a kw-only (decisión cerrada #10) **sí**
+  es housekeeping autorizado — no toca el contrato de forma escalar, solo
+  cómo se invoca. No lo tomes como pie para vectorizar de paso.
 - Campos de `GradientResult`: pasar `float` → `ArrayLike` cambia el
   contrato de retorno de toda la capa physics. Decisión de diseño abierta.
 
