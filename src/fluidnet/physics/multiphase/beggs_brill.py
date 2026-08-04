@@ -124,6 +124,7 @@ def _holdup(
 
 
 def _beggs_brill_detailed(
+    *,
     liquid_mass_rate: float,
     gas_mass_rate: float,
     rho_liquid: float,
@@ -131,11 +132,10 @@ def _beggs_brill_detailed(
     mu_liquid: float,
     mu_gas: float,
     D: float,
-    *,
     inclination: float = 0.0,
     roughness: float = 1.5e-4,
     sigma: float = 30.0,
-    mix_compressibility: float = 0.0,
+    compressibility: float = 0.0,
     holdup_adj: float = 1.0,
     payne_correction: bool = True,
 ) -> dict[str, Any]:
@@ -163,7 +163,7 @@ def _beggs_brill_detailed(
         Absolute roughness [m]. Default 0.15 mm.
     sigma : float, optional
         Surface tension [dyn/cm]. Default 30.
-    mix_compressibility : float, optional
+    compressibility : float, optional
         Mixture compressibility [1/Pa] for the momentum term. Default 0.
     holdup_adj : float, optional
         Holdup multiplier (result clipped to [0, 1]). Default 1.
@@ -234,7 +234,7 @@ def _beggs_brill_detailed(
     grad[1] = -2 * f / D * v_mix**2 * rho_ns
 
     # momentum
-    eh = mix_compressibility * rho_mix * v_mix**2
+    eh = compressibility * rho_mix * v_mix**2
     if np.any(eh >= 1):
         raise ValueError("Supersonic flow encountered")
     if np.any(eh > 0.9):
@@ -259,6 +259,7 @@ def _beggs_brill_detailed(
 
 
 def beggs_brill_gradient(
+    *,
     liquid_mass_rate: float,
     gas_mass_rate: float,
     rho_liquid: float,
@@ -266,11 +267,10 @@ def beggs_brill_gradient(
     mu_liquid: float,
     mu_gas: float,
     D: float,
-    *,
     inclination: float = 0.0,
     roughness: float = 1.5e-4,
     sigma: float = 30.0,
-    mix_compressibility: float = 0.0,
+    compressibility: float = 0.0,
     holdup_adj: float = 1.0,
     payne_correction: bool = True,
 ) -> GradientResult:
@@ -293,7 +293,7 @@ def beggs_brill_gradient(
         Absolute roughness [m]. Default 0.15 mm.
     sigma : float, optional
         Surface tension [dyn/cm]. Default 30.
-    mix_compressibility : float, optional
+    compressibility : float, optional
         Mixture compressibility [1/Pa] for the momentum term. Default 0.
     holdup_adj : float, optional
         Holdup multiplier (result clipped to [0, 1]). Default 1.
@@ -307,17 +307,17 @@ def beggs_brill_gradient(
         sign convention.
     """
     grad = _beggs_brill_detailed(
-        liquid_mass_rate,
-        gas_mass_rate,
-        rho_liquid,
-        rho_gas,
-        mu_liquid,
-        mu_gas,
-        D,
+        liquid_mass_rate=liquid_mass_rate,
+        gas_mass_rate=gas_mass_rate,
+        rho_liquid=rho_liquid,
+        rho_gas=rho_gas,
+        mu_liquid=mu_liquid,
+        mu_gas=mu_gas,
+        D=D,
         inclination=inclination,
         roughness=roughness,
         sigma=sigma,
-        mix_compressibility=mix_compressibility,
+        compressibility=compressibility,
         holdup_adj=holdup_adj,
         payne_correction=payne_correction,
     )["gradient"]

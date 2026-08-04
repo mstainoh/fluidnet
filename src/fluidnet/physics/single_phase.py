@@ -11,11 +11,11 @@ from .types import ArrayLike, GradientResult
 
 
 def single_phase_gradient(
+    *,
     mass_rate: ArrayLike,
     D: ArrayLike,
     density: ArrayLike,
     viscosity: ArrayLike,
-    *,
     inclination: ArrayLike = 0.0,
     roughness: ArrayLike = 1.5e-4,
     compressibility: ArrayLike = 0.0,

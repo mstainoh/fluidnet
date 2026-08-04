@@ -32,23 +32,32 @@ class TestFrictionFactor:
 
 
 class TestSinglePhase:
+    def test_positional_args_forbidden(self) -> None:
+        """All params are keyword-only: no arg-order bug can recur (see CLAUDE.md §8)."""
+        with pytest.raises(TypeError):
+            single_phase_gradient(10, 0.1, 1000, 1e-3)  # type: ignore
+
     def test_horizontal_no_gravity(self) -> None:
-        res = single_phase_gradient(10, 0.1, 1000, 1e-3)
+        res = single_phase_gradient(mass_rate=10, D=0.1, density=1000, viscosity=1e-3)
         assert res.gravity == 0
         assert res.friction < 0
         assert res.total == pytest.approx(res.friction)
 
     def test_static_column(self) -> None:
         """Zero rate, vertical: pure hydrostatic gradient -rho*g."""
-        res = single_phase_gradient(0, 0.1, 1000, 1e-3, inclination=1.0)
+        res = single_phase_gradient(
+            mass_rate=0, D=0.1, density=1000, viscosity=1e-3, inclination=1.0
+        )
         assert res.friction == 0
         assert res.gravity == pytest.approx(-1000 * 9.80665, rel=1e-4)
 
     def test_reversed_flow_flips_friction_sign(self) -> None:
-        fwd = single_phase_gradient(10, 0.1, 1000, 1e-3)
-        rev = single_phase_gradient(-10, 0.1, 1000, 1e-3)
+        fwd = single_phase_gradient(mass_rate=10, D=0.1, density=1000, viscosity=1e-3)
+        rev = single_phase_gradient(mass_rate=-10, D=0.1, density=1000, viscosity=1e-3)
         assert rev.friction == pytest.approx(-fwd.friction)
 
     def test_supersonic_raises(self) -> None:
         with pytest.raises(ValueError, match="Supersonic"):
-            single_phase_gradient(500, 0.05, 1.2, 1.8e-5, compressibility=1e-3)
+            single_phase_gradient(
+                mass_rate=500, D=0.05, density=1.2, viscosity=1.8e-5, compressibility=1e-3
+            )

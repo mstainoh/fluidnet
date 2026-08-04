@@ -37,13 +37,13 @@ def test_kermit_brown_example_4_7() -> None:
     qg = (qgs - qos * Rs) * Bg
 
     calc = _beggs_brill_detailed(
-        qo * rho_liquid,
-        qg * rho_gas,
-        rho_liquid,
-        rho_gas,
-        mu_liquid,
-        mu_gas,
-        D,
+        liquid_mass_rate=qo * rho_liquid,
+        gas_mass_rate=qg * rho_gas,
+        rho_liquid=rho_liquid,
+        rho_gas=rho_gas,
+        mu_liquid=mu_liquid,
+        mu_gas=mu_gas,
+        D=D,
         inclination=1.0,
         roughness=eps,
         sigma=sigma,
@@ -92,13 +92,13 @@ def test_kermit_brown_example_4_7() -> None:
 def test_checalc_case_no_payne() -> None:
     """checalc.com Beggs & Brill sample (no Payne correction)."""
     calc = _beggs_brill_detailed(
-        4.75 / SPC.hour * 613.8,
-        9 / SPC.hour * 141.3,
-        613.8,
-        141.3,
-        0.5e-3,
-        0.02e-3,
-        50e-3,
+        liquid_mass_rate=4.75 / SPC.hour * 613.8,
+        gas_mass_rate=9 / SPC.hour * 141.3,
+        rho_liquid=613.8,
+        rho_gas=141.3,
+        mu_liquid=0.5e-3,
+        mu_gas=0.02e-3,
+        D=50e-3,
         inclination=np.sin(np.deg2rad(90)),
         roughness=0.0018e-3,
         sigma=28.0,

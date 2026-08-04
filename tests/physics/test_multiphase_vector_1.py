@@ -88,7 +88,9 @@ class TestDetailedScalarContract:
 
     def test_detailed_scalar_contract_today(self) -> None:
         """Scalars in -> scalars out; no stray 0-d array leaks into GradientResult."""
-        calc = _beggs_brill_detailed(0.8, 0.05, **DETAILED_ARGS)
+        calc = _beggs_brill_detailed(
+            liquid_mass_rate=0.8, gas_mass_rate=0.05, **DETAILED_ARGS
+        )
         grad = calc["gradient"]
 
         for value in (
@@ -104,13 +106,13 @@ class TestDetailedScalarContract:
         ql = np.array([0.8, 1.0])
         qg = np.array([0.05, 0.06])
         with pytest.raises(ValueError, match="ambiguous"):
-            _beggs_brill_detailed(ql, qg, **DETAILED_ARGS)
+            _beggs_brill_detailed(liquid_mass_rate=ql, gas_mass_rate=qg, **DETAILED_ARGS)
 
     @pytest.mark.xfail(strict=True, reason="v0.5 roadmap: broadcast rates -> vectorized GradientResult")
     def test_detailed_vectorized_over_rates(self) -> None:
         ql = np.array([0.8, 1.0, 1.2])
         qg = np.array([0.05, 0.06, 0.07])
-        calc = _beggs_brill_detailed(ql, qg, **DETAILED_ARGS)
+        calc = _beggs_brill_detailed(liquid_mass_rate=ql, gas_mass_rate=qg, **DETAILED_ARGS)
         assert calc["gradient"].total.shape == (3,)
 
 
@@ -120,7 +122,7 @@ class TestGradientScalarContract:
     the limitation and (eventually) the fix."""
 
     def test_gradient_scalar_contract_today(self) -> None:
-        grad = beggs_brill_gradient(0.8, 0.05, **DETAILED_ARGS)
+        grad = beggs_brill_gradient(liquid_mass_rate=0.8, gas_mass_rate=0.05, **DETAILED_ARGS)
 
         for value in grad:
             assert np.ndim(value) == 0
@@ -130,11 +132,11 @@ class TestGradientScalarContract:
         ql = np.array([0.8, 1.0])
         qg = np.array([0.05, 0.06])
         with pytest.raises(ValueError, match="ambiguous"):
-            beggs_brill_gradient(ql, qg, **DETAILED_ARGS)
+            beggs_brill_gradient(liquid_mass_rate=ql, gas_mass_rate=qg, **DETAILED_ARGS)
 
     @pytest.mark.xfail(strict=True, reason="v0.5 roadmap: broadcast rates -> vectorized GradientResult")
     def test_gradient_vectorized_over_rates(self) -> None:
         ql = np.array([0.8, 1.0, 1.2])
         qg = np.array([0.05, 0.06, 0.07])
-        grad = beggs_brill_gradient(ql, qg, **DETAILED_ARGS)
+        grad = beggs_brill_gradient(liquid_mass_rate=ql, gas_mass_rate=qg, **DETAILED_ARGS)
         assert grad.total.shape == (3,)
