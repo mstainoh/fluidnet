@@ -48,12 +48,63 @@
   como corolario ya cerrado. Docstrings de ambas funciones actualizados.
 - `python -m pytest tests/physics/` y `python -m mypy` verdes tras los
   cambios.
+- **`tests/physics/test_beggs_brill_vs_fluids.py` creado (Marcelo)**,
+  implementando por fin la estrategia de cross-validation contra `fluids`
+  documentada en el ADR §3.2 pero nunca comiteada (confirmado por `git log`
+  sin resultados para ningún archivo `*vs_fluids*`, ver "Abierto" de la
+  sesión 2026-07-31). Verificarlo destapó un **bug real, no un problema del
+  test**:
+  - **`_holdup` interpolaba mal el régimen `transition`**: usaba
+    intermittent+distributed (`_holdup(1, ...)` + `_holdup(2, ...)`) en vez
+    de segregated+intermittent. Confirmado incorrecto contra el propio
+    código fuente de `fluids` (`Beggs_Brill`/`_Beggs_Brill_holdup`,
+    instalado localmente): interpola siempre segregated+intermittent, igual
+    que la fórmula publicada. Este es exactamente el bug que el ADR §4 ya
+    daba por "corregido" — la corrección nunca había llegado al código.
+    Fix de una línea (`beggs_brill.py`): `_holdup(0, ...)` +
+    `_holdup(1, ...)`. Confirmado por `test_against_fluids_live`
+    (comparación en vivo contra `fluids`, no valores pinneados) pasando
+    para los 2 casos `transition_*` tras el fix; sin regresiones en
+    `test_beggs_brill_vs_book.py` / `test_multiphase_vector_1.py` (14 tests).
+  - **Precisión de los valores pinneados en `GOLDEN`**: `liquid_holdup` y
+    `mixture_density` estaban copiados a 6 cifras significativas con
+    `rtol=1e-6` (convención de este repo para holdup, ver "Convenciones de
+    testing" en `CLAUDE.md`) — demasiado ajustado para el redondeo manual,
+    fallaban 6 de 8 casos por error de ~1e-6–2e-6 aun siendo correctos.
+    Regenerados con precisión completa llamando directamente a las
+    funciones internas de `fluids` (mismo cálculo que hace
+    `fluids.two_phase.Beggs_Brill` puertas adentro, replicado para poder
+    extraer `Hl`/`rhos` en vez de solo el `dP` total que expone la API
+    pública). `rtol=1e-6` se mantuvo sin tocar — no era un problema de
+    tolerancia sino de cuántos dígitos se habían pegado a mano.
+  - 17/17 tests pasando en el archivo tras ambos fixes.
+- ADR (`physics-single-multiphase.md` §3.2 y la mención en §1) actualizada:
+  el nombre real es `test_beggs_brill_vs_fluids.py`, no
+  `test_multiphase_vs_fluids.py` como decía el documento.
 
-**Abierto:** (sin cambios respecto al 2026-08-04, ver esa entrada)
+**Cerrado (cont.):**
 
-- Unificar nombre `compressibility` vs. `mix_compressibility`.
+- **Unificación `compressibility` vs. `mix_compressibility` — resuelta,
+  solo faltaba documentarlo.** Al revisar el pedido de unificar nombres se
+  encontró que el código ya no tenía el problema: el commit `7142191`
+  (2026-08-04, refactor kw-only) ya había renombrado
+  `mix_compressibility` → `compressibility` en `_beggs_brill_detailed` y
+  `beggs_brill_gradient`, igual que en `single_phase_gradient`. `grep` en
+  `src/` y `tests/` confirma cero ocurrencias de `mix_compressibility`. Lo
+  que quedaba desincronizado era la documentación: ADR §1
+  (`physics-single-multiphase.md`) seguía describiendo el nombre viejo como
+  "hoy vigente" y la unificación como abierta — corregido para reflejar que
+  ya está cerrada.
+
+**Abierto:** (ver también 2026-08-04)
+
 - Función de estado (agrupar densidad/viscosidad/sigma) antes de `physics`.
 - `Rate.as_physics_kwargs()` como adaptador.
+- ADR §3.2 sigue describiendo `test_holdup_within_physical_bounds` /
+  `test_against_fluids_live` / `test_golden_vs_fluids_pinned` como diseño;
+  ahora coinciden con el archivo real — si en el futuro se los toca,
+  actualizar ambos lados juntos. (Revisado 2026-08-07: siguen coincidiendo,
+  nada que corregir.)
 
 **Próximo paso:**
 
