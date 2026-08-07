@@ -134,7 +134,7 @@ def _beggs_brill_detailed(
     D: float,
     inclination: float = 0.0,
     roughness: float = 1.5e-4,
-    sigma: float = 30.0,
+    sigma: float = 30.0e-3,
     compressibility: float = 0.0,
     holdup_adj: float = 1.0,
     payne_correction: bool = True,
@@ -149,8 +149,8 @@ def _beggs_brill_detailed(
     Parameters
     ----------
     liquid_mass_rate, gas_mass_rate : float
-        Mass rates [kg/s]. Both non-negative (co-current) or both
-        non-positive (reversed); counterflow raises ``ValueError``.
+        Mass rates [kg/s]. Both non-negative; flow direction is resolved
+        by the integrator, not here. Negative rates raise ``ValueError``.
     rho_liquid, rho_gas : float
         Phase densities [kg/m3].
     mu_liquid, mu_gas : float
@@ -162,7 +162,7 @@ def _beggs_brill_detailed(
     roughness : float, optional
         Absolute roughness [m]. Default 0.15 mm.
     sigma : float, optional
-        Surface tension [dyn/cm]. Default 30.
+        Surface tension [N/m]. Default 30e-3.
     compressibility : float, optional
         Mixture compressibility [1/Pa] for the momentum term. Default 0.
     holdup_adj : float, optional
@@ -180,17 +180,11 @@ def _beggs_brill_detailed(
     """
     grad = np.zeros(3)
 
-    if liquid_mass_rate > 0 and gas_mass_rate >= 0:
-        inverse_flow = False
-    elif liquid_mass_rate <= 0 and gas_mass_rate <= 0:
-        inverse_flow = True
-        liquid_mass_rate = abs(liquid_mass_rate)
-        gas_mass_rate = abs(gas_mass_rate)
-        inclination = -inclination
-    else:
+    if liquid_mass_rate < 0 or gas_mass_rate < 0:
         raise ValueError(
-            f"counterflow not allowed (ql={liquid_mass_rate:.3f} kg/s, "
-            f"qg={gas_mass_rate:.3f} kg/s)"
+            f"negative rates not allowed (ql={liquid_mass_rate:.3f} kg/s, "
+            f"qg={gas_mass_rate:.3f} kg/s); flow direction is resolved by "
+            f"the integrator, not physics"
         )
 
     ql = liquid_mass_rate / rho_liquid
@@ -206,7 +200,7 @@ def _beggs_brill_detailed(
     NFr = froude(v_mix, D) ** 2
     re_ns = reynolds(v_mix, D, rho_ns, mu_ns)
     vsl = ql / area
-    Nlv = vsl * (rho_liquid / (0.001 * sigma * spc.g)) ** 0.25
+    Nlv = vsl * (rho_liquid / (sigma * spc.g)) ** 0.25
 
     i = int(beggs_brill_flowmap(np.asarray(Cl), np.asarray(NFr)))
 
@@ -241,9 +235,6 @@ def _beggs_brill_detailed(
         warnings.warn("Flow is close to supersonic", stacklevel=2)
     grad[2] = (grad[0] + grad[1]) * eh / (1 - eh)
 
-    if inverse_flow:
-        grad = -grad
-
     return {
         "gradient": GradientResult(*grad),
         "flow_regime": FLOW_REGIMES[i],
@@ -269,7 +260,7 @@ def beggs_brill_gradient(
     D: float,
     inclination: float = 0.0,
     roughness: float = 1.5e-4,
-    sigma: float = 30.0,
+    sigma: float = 30.0e-3,
     compressibility: float = 0.0,
     holdup_adj: float = 1.0,
     payne_correction: bool = True,
@@ -279,8 +270,8 @@ def beggs_brill_gradient(
     Parameters
     ----------
     liquid_mass_rate, gas_mass_rate : float
-        Mass rates [kg/s]. Both non-negative (co-current) or both
-        non-positive (reversed); counterflow raises ``ValueError``.
+        Mass rates [kg/s]. Both non-negative; flow direction is resolved
+        by the integrator, not here. Negative rates raise ``ValueError``.
     rho_liquid, rho_gas : float
         Phase densities [kg/m3].
     mu_liquid, mu_gas : float
@@ -292,7 +283,7 @@ def beggs_brill_gradient(
     roughness : float, optional
         Absolute roughness [m]. Default 0.15 mm.
     sigma : float, optional
-        Surface tension [dyn/cm]. Default 30.
+        Surface tension [N/m]. Default 30e-3.
     compressibility : float, optional
         Mixture compressibility [1/Pa] for the momentum term. Default 0.
     holdup_adj : float, optional

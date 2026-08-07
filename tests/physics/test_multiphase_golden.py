@@ -18,7 +18,7 @@ def test_kermit_brown_example_4_7() -> None:
     P = 1700 * SPC.psi
     T = SPC.convert_temperature(180, "F", "K")
 
-    sigma = 8.41
+    sigma = 8.41e-3
     eps = 6e-6 * SPC.foot
     mu_liquid = 0.97e-3
     mu_gas = 0.016e-3
@@ -101,7 +101,7 @@ def test_checalc_case_no_payne() -> None:
         D=50e-3,
         inclination=np.sin(np.deg2rad(90)),
         roughness=0.0018e-3,
-        sigma=28.0,
+        sigma=28.0e-3,
         payne_correction=False,
     )
 

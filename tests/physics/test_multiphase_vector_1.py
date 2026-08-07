@@ -29,7 +29,7 @@ DETAILED_ARGS = dict(
     D=50e-3,
     inclination=1.0,
     roughness=0.0018e-3,
-    sigma=28.0,
+    sigma=28.0e-3,
     payne_correction=False,
 )
 
