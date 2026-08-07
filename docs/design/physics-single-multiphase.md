@@ -23,15 +23,14 @@ una propiedad física del fluido — no un switch que activa o desactiva un
 modo de cálculo. Entra en el término de aceleración (momentum) vía
 `dP/dx = (grav + fric) / (1 − ρv²β)`: `β = 0` es el valor físico exacto de
 un líquido incompresible, no una aproximación ni un caso especial. En
-`beggs_brill_gradient` el parámetro hoy llamado `mix_compressibility` es el
-mismo concepto para la mezcla (ponderada por holdup) — el plan es que
-termine siendo el mismo nombre que en `single_phase_gradient`
-(`compressibility`), a propósito, para que el futuro adaptador `Rate` →
-`physics` pueda emitir una sola clave sin ramificar por modelo; unificar el
-nombre sigue **abierto** (ver `session-log.md` 2026-08-04). (Ver también la
-nota sobre régimen algebraico/integral en `architecture-v0.2.md` §2.2:
-`compressibility == 0` es justamente el discriminador de runtime entre los
-dos protocolos de loss.)
+`beggs_brill_gradient` es el mismo concepto para la mezcla (ponderada por
+holdup); el parámetro se llamaba `mix_compressibility` hasta que se unificó
+a `compressibility` en el refactor kw-only (commit `7142191`, 2026-08-04) —
+mismo nombre que en `single_phase_gradient`, a propósito, para que el
+futuro adaptador `Rate` → `physics` pueda emitir una sola clave sin
+ramificar por modelo. (Ver también la nota sobre régimen algebraico/integral
+en `architecture-v0.2.md` §2.2: `compressibility == 0` es justamente el
+discriminador de runtime entre los dos protocolos de loss.)
 
 **Testing**: golden tests contra casos de libro/referencia (mismo patrón que
 `multiphase`, ver §3). 11 tests pasando entre los cuatro módulos de physics
