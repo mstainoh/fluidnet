@@ -39,7 +39,7 @@ orientaciones (horizontal, uphill, vertical, downhill).
 """
 
 import logging
-
+from typing import cast
 import numpy as np
 import pytest
 import scipy.constants as spc
@@ -162,14 +162,14 @@ def test_golden_vs_fluids_pinned(name: str) -> None:
     """
     case = GOLDEN[name]
     calc = _beggs_brill_detailed(
-        liquid_mass_rate=case["liquid_mass_rate"],
-        gas_mass_rate=case["gas_mass_rate"],
+        liquid_mass_rate=cast(float, case["liquid_mass_rate"]),
+        gas_mass_rate=cast(float, case["gas_mass_rate"]),
         rho_liquid=RHO_LIQUID,
         rho_gas=RHO_GAS,
         mu_liquid=MU_LIQUID,
         mu_gas=MU_GAS,
         D=D,
-        inclination=np.sin(np.deg2rad(case["angle_deg"])),
+        inclination=np.sin(np.deg2rad(cast(float, case["angle_deg"]))),
         roughness=ROUGHNESS,
         sigma=SIGMA,
         payne_correction=False,
@@ -182,7 +182,7 @@ def test_golden_vs_fluids_pinned(name: str) -> None:
 
     for key, attr in [("liquid_holdup", "liquid_holdup"),
                        ("mixture_density", "mixture_density")]:
-        expected, tol = case[attr]
+        expected, tol = cast(tuple[float, float], case[attr])
         err = _rel_err(calc[key], expected)
         logger.info("[%s] %s: calc=%.6g fluids=%.6g rel_err=%.2e (tol=%.2e)",
                     name, key, calc[key], expected, err, tol)
@@ -191,7 +191,7 @@ def test_golden_vs_fluids_pinned(name: str) -> None:
     g = calc["gradient"]
     for key, attr, val in [("gravity", "grad_gravity", g.gravity),
                             ("friction", "grad_friction", g.friction)]:
-        expected, tol = case[attr]
+        expected, tol = cast(tuple[float, float], case[attr])
         err = _rel_err(val, expected)
         logger.info("[%s] gradient.%s: calc=%.6g fluids=%.6g rel_err=%.4f (tol=%.3f)",
                     name, key, val, expected, err, tol)
@@ -216,21 +216,21 @@ def test_against_fluids_live(name: str) -> None:
     case = GOLDEN[name]
 
     calc = _beggs_brill_detailed(
-        liquid_mass_rate=case["liquid_mass_rate"],
-        gas_mass_rate=case["gas_mass_rate"],
+        liquid_mass_rate=cast(float, case["liquid_mass_rate"]),
+        gas_mass_rate=cast(float, case["gas_mass_rate"]),
         rho_liquid=RHO_LIQUID,
         rho_gas=RHO_GAS,
         mu_liquid=MU_LIQUID,
         mu_gas=MU_GAS,
         D=D,
-        inclination=np.sin(np.deg2rad(case["angle_deg"])),
+        inclination=np.sin(np.deg2rad(cast(float, case["angle_deg"]))),
         roughness=ROUGHNESS,
         sigma=SIGMA,
         payne_correction=False,
     )
 
-    m = case["liquid_mass_rate"] + case["gas_mass_rate"]
-    x = case["gas_mass_rate"] / m
+    m = cast(float, case["liquid_mass_rate"]) + cast(float, case["gas_mass_rate"])
+    x = cast(float, case["gas_mass_rate"]) / m
     dp_fluids = fluids_tp.Beggs_Brill(
         m=m, x=x, rhol=RHO_LIQUID, rhog=RHO_GAS, mul=MU_LIQUID, mug=MU_GAS,
         sigma=SIGMA, P=1e5, D=D, angle=case["angle_deg"], roughness=ROUGHNESS,
