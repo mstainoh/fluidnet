@@ -86,7 +86,7 @@ Result (contrato de salida, solo lo produce el solver)
 - **Tests de comportamiento vectorial** (`test_flowmap_vectorized`,
   `test_detailed_scalar_contract_today`, `test_detailed_vectorized_over_rates`
   xfail) viven en `tests/physics/test_multiphase_vector_1.py`, archivo
-  separado — **no** en `test_multiphase_golden.py` como decía originalmente
+  separado — **no** en `test_beggs_brill_vs_book.py` como decía originalmente
   la ADR §3.3. Decisión tomada en sesión de código 2026-07-31; ADR
   actualizada en la misma sesión.
 

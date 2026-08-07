@@ -20,7 +20,7 @@ from fluidnet.physics.multiphase import (
 from fluidnet.physics.multiphase.beggs_brill import _beggs_brill_detailed, _holdup
 
 # Shared scalar physical inputs (checalc.com sample, no Payne correction —
-# same case as test_checalc_case_no_payne in test_multiphase_golden.py).
+# same case as test_checalc_case_no_payne in test_beggs_brill_vs_book.py).
 DETAILED_ARGS = dict(
     rho_liquid=613.8,
     rho_gas=141.3,

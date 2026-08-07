@@ -36,8 +36,8 @@ dos protocolos de loss.)
 **Testing**: golden tests contra casos de libro/referencia (mismo patrón que
 `multiphase`, ver §3). 11 tests pasando entre los cuatro módulos de physics
 (`dimensionless`, `friction`, `single_phase`, `multiphase`) al momento de
-escribir esto — la cuenta crece con lo agregado en `test_multiphase_golden.py`
-y `test_multiphase_vs_fluids.py`.
+escribir esto — la cuenta crece con lo agregado en `test_beggs_brill_vs_book.py`
+y `test_beggs_brill_vs_fluids.py`.
 
 ---
 
@@ -84,7 +84,7 @@ negativo), consistente con el resto del paquete.
 
 Tres archivos, cada uno con un rol distinto — no son redundantes:
 
-### 3.1 `test_multiphase_golden.py` — validación contra literatura
+### 3.1 `test_beggs_brill_vs_book.py` — validación contra literatura
 
 - **Kermit Brown, ejemplo 4.7**: caso de libro con NFr, Re, f (Darcy,
   book/4 para Fanning), holdup y gradientes gravitacional/friccional
@@ -96,7 +96,7 @@ Tres archivos, cada uno con un rol distinto — no son redundantes:
 - Logging INFO antes de cada assert: valor calculado, valor esperado, error
   relativo — para debuguear sin tener que parchear el test.
 
-### 3.2 `test_multiphase_vs_fluids.py` — cross-validation con `fluids` (ChEDL)
+### 3.2 `test_beggs_brill_vs_fluids.py` — cross-validation con `fluids` (ChEDL)
 
 - 8 casos (`GOLDEN`) cubriendo los 3 regímenes puros + transition, en
   horizontal / uphill / vertical / downhill.
@@ -117,7 +117,7 @@ Tres archivos, cada uno con un rol distinto — no son redundantes:
 
 ### 3.3 Comportamiento de arrays (`test_multiphase_vector_1.py`)
 
-Archivo separado de `test_multiphase_golden.py`: golden testea corrección
+Archivo separado de `test_beggs_brill_vs_book.py`: golden testea corrección
 física (valores contra literatura/oráculo), este archivo testea el
 *contrato de forma* (qué soporta arrays y qué no) — son preocupaciones
 distintas, no redundancia. Recorre las funciones de `beggs_brill.py` en el
@@ -166,7 +166,7 @@ orden en que están definidas en el módulo (flowmap → holdup → detailed →
 - **Unidad de `sigma` — cerrada e implementada.** SI estricto (N/m), no
   dyn/cm, en `_beggs_brill_detailed` y `beggs_brill_gradient` (defaults
   `30e-3`). Conversión `sigma * 1e-3` retirada de los golden tests
-  (`test_multiphase_golden.py`) y de `test_multiphase_vector_1.py`;
+  (`test_beggs_brill_vs_book.py`) y de `test_multiphase_vector_1.py`;
   `fluids` espera N/m también, así que no queda compensación pendiente.
 - **Vectorización**: no implementada (`_beggs_brill_detailed` es escalar);
   `beggs_brill_flowmap` sí. Ver roadmap v0.5 (broadcasting `pd.Series`).
