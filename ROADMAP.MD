@@ -238,8 +238,5 @@ tag `v1.0`.
   dueño del modelo de propiedades (`Rate` o red).
 - Mecanismo del canal de `@diagnostic` (contextvar vs. objeto colector) —
   bloquea `darcy_weisbach`.
-- Ubicación de `GradientResult`: hoy vive en `single_phase.py` pero es el
-  contrato compartido con `multiphase.py`. Candidato a `physics/types.py` para
-  que la dependencia entre módulos de physics no sea lateral.
 - Port fino del solver 3: revisar `header_network_optimizer.py` y
   `network_observations.py` de mineplanner (fuera de scope v0.2).
