@@ -96,12 +96,12 @@ def _holdup(
         a, b, c = 0.845, 0.5351, 0.0173  # intermittent
     elif i == 2:
         a, b, c = 1.065, 0.5824, 0.0609  # distributed
-    elif i == 3:  # transition: interpolate intermittent/distributed
+    elif i == 3:  # transition: interpolate segregated/intermittent
         L2 = 0.0009252 * Cl**-2.4684
         L3 = 0.1 * Cl**-1.4516
         A = (L3 - NFr) / (L3 - L2)
-        return A * _holdup(1, Cl, NFr, Nlv, angle) + (1 - A) * _holdup(
-            2, Cl, NFr, Nlv, angle
+        return A * _holdup(0, Cl, NFr, Nlv, angle) + (1 - A) * _holdup(
+            1, Cl, NFr, Nlv, angle
         )
     else:
         raise ValueError("regime index must be in 0..3")
