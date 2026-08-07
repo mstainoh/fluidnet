@@ -51,9 +51,9 @@ hoy — ver §4 para lo que falta.
 SI estricto (kg/s, kg/m³, Pa·s, m, N/m para `sigma` — ver §4), enteramente
 keyword-only (`CLAUDE.md` decisión cerrada #10).
 
-**Precondición de signo (decisión de diseño 2026-08-04, implementación
-pendiente)**: `liquid_mass_rate >= 0` y `gas_mass_rate >= 0`, con
-`ValueError` fuera de ese rango — reemplaza la rama actual de "flujo
+**Precondición de signo (decisión de diseño 2026-08-04, implementada
+2026-08-07)**: `liquid_mass_rate >= 0` y `gas_mass_rate >= 0`, con
+`ValueError` fuera de ese rango — reemplazó la rama que existía de "flujo
 reverso" (`liquid_mass_rate <= 0 and gas_mass_rate <= 0` → `abs()` +
 inclinación invertida). `beggs_brill_gradient`/`_beggs_brill_detailed` no
 conocen la orientación del edge; la dirección de flujo no es una feature de
@@ -163,11 +163,11 @@ orden en que están definidas en el módulo (flowmap → holdup → detailed →
   Cl alto). Documentado como desviación intencional, no discrepancia.
 - **Payne correction**: solo en fluidnet; `fluids` no la tiene — todos los
   tests cross-validation la desactivan (`payne_correction=False`).
-- **Unidad de `sigma` — cerrada.** SI estricto (N/m), no dyn/cm. Pendiente:
-  sacar la conversión `sigma * 1e-3` de `test_multiphase_vs_fluids.py` (los
-  casos `GOLDEN` están en N/m nativo ahora; `fluids` sigue esperando N/m
-  también, así que el `* 1e-3` que compensaba el dyn/cm de fluidnet queda
-  sin sentido y hay que borrarlo, no solo ajustarlo).
+- **Unidad de `sigma` — cerrada e implementada.** SI estricto (N/m), no
+  dyn/cm, en `_beggs_brill_detailed` y `beggs_brill_gradient` (defaults
+  `30e-3`). Conversión `sigma * 1e-3` retirada de los golden tests
+  (`test_multiphase_golden.py`) y de `test_multiphase_vector_1.py`;
+  `fluids` espera N/m también, así que no queda compensación pendiente.
 - **Vectorización**: no implementada (`_beggs_brill_detailed` es escalar);
   `beggs_brill_flowmap` sí. Ver roadmap v0.5 (broadcasting `pd.Series`).
 

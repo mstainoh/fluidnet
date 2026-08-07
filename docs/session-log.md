@@ -25,6 +25,47 @@
 
 ---
 
+## 2026-08-07 — código
+
+**Cerrado:**
+
+- Conversión de `sigma` a SI (N/m) en `multiphase/beggs_brill.py` y golden
+  tests, cerrando el ítem pendiente de la sesión de diseño 2026-08-04. Al
+  verificar el cambio (hecho por Marcelo) se encontraron dos puntos
+  desincronizados y se corrigieron en la misma sesión:
+  - `beggs_brill_gradient` (wrapper público) seguía con
+    `sigma: float = 30.0` (dyn/cm) y docstring sin actualizar — solo
+    `_beggs_brill_detailed` se había convertido.
+  - `tests/physics/test_multiphase_vector_1.py::DETAILED_ARGS` seguía con
+    `sigma=28.0`; el comentario del propio archivo la marca como "same case
+    as `test_checalc_case_no_payne`", que ya usaba `28.0e-3`.
+- **Precondición de signo en `_beggs_brill_detailed`/`beggs_brill_gradient`**
+  (segunda mitad del "próximo paso" del 2026-08-04, ya cerrada como decisión
+  ahí): reemplazada la rama de flujo reverso (`abs()` + inclinación
+  invertida + flip de signo del gradiente al final) por
+  `if liquid_mass_rate < 0 or gas_mass_rate < 0: raise ValueError(...)`.
+  Dirección de flujo queda resuelta por el integrador, no por `physics`,
+  como corolario ya cerrado. Docstrings de ambas funciones actualizados.
+- `python -m pytest tests/physics/` y `python -m mypy` verdes tras los
+  cambios.
+
+**Abierto:** (sin cambios respecto al 2026-08-04, ver esa entrada)
+
+- Unificar nombre `compressibility` vs. `mix_compressibility`.
+- Función de estado (agrupar densidad/viscosidad/sigma) antes de `physics`.
+- `Rate.as_physics_kwargs()` como adaptador.
+
+**Próximo paso:**
+
+- Sesión de **diseño**: cerrar la firma de `Rate`/`ScalarRate`
+  (`ROADMAP.md` → Secuencia inmediata #1) — bloqueante del MVP. Ya no
+  incluye resolver la unidad de `sigma` (cerrado hoy); sigue pendiente
+  definir quién es dueño del modelo de propiedades (densidad/viscosidad) y
+  cómo encajan la unificación de `compressibility` y `as_physics_kwargs()`
+  listadas en "Abierto".
+
+---
+
 ## 2026-08-04 — diseño
 
 **Cerrado:**

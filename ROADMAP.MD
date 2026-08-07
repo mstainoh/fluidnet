@@ -167,8 +167,9 @@ tag `v1.0`.
 ## Secuencia inmediata (dentro del MVP, en orden)
 
 1. **Cerrar la firma de `Rate`/`ScalarRate`** — es el bloqueante de todo: sin
-   ella no hay `loss_func`, ni `Network`, ni `Result`. Incluye resolver la
-   unidad de `sigma` (dyn/cm → N/m) y quién es dueño del modelo de propiedades.
+   ella no hay `loss_func`, ni `Network`, ni `Result`. Incluye resolver quién
+   es dueño del modelo de propiedades (unidad de `sigma` ya resuelta a SI,
+   ver `physics-single-multiphase.md` §4).
 2. **Diseño del caso demo** — red sintética de wellfield: inputs, outputs, qué
    muestra el notebook. Define los tests de aceptación y tensiona la firma de
    `Rate` contra un uso real. Sin código.
@@ -234,7 +235,7 @@ tag `v1.0`.
 - **Firma de `Rate`/`ScalarRate`** — bloqueante del MVP (ver secuencia §1).
   Sub-decisiones: alcance del estado (cinemática sola vs. cinemática +
   propiedades vs. cinemática + composición con propiedades derivadas); quién es
-  dueño del modelo de propiedades (`Rate` o red); unidad de `sigma`.
+  dueño del modelo de propiedades (`Rate` o red).
 - Mecanismo del canal de `@diagnostic` (contextvar vs. objeto colector) —
   bloquea `darcy_weisbach`.
 - Ubicación de `GradientResult`: hoy vive en `single_phase.py` pero es el
