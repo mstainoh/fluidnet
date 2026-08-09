@@ -22,10 +22,10 @@ from fluidnet.physics.multiphase.beggs_brill import _beggs_brill_detailed, _hold
 # Shared scalar physical inputs (checalc.com sample, no Payne correction —
 # same case as test_checalc_case_no_payne in test_beggs_brill_vs_book.py).
 DETAILED_ARGS = dict(
-    rho_liquid=613.8,
-    rho_gas=141.3,
-    mu_liquid=0.5e-3,
-    mu_gas=0.02e-3,
+    density_liquid=613.8,
+    density_gas=141.3,
+    viscosity_liquid=0.5e-3,
+    viscosity_gas=0.02e-3,
     D=50e-3,
     inclination=1.0,
     roughness=0.0018e-3,
@@ -89,7 +89,7 @@ class TestDetailedScalarContract:
     def test_detailed_scalar_contract_today(self) -> None:
         """Scalars in -> scalars out; no stray 0-d array leaks into GradientResult."""
         calc = _beggs_brill_detailed(
-            liquid_mass_rate=0.8, gas_mass_rate=0.05, **DETAILED_ARGS
+            mass_rate_liquid=0.8, mass_rate_gas=0.05, **DETAILED_ARGS
         )
         grad = calc["gradient"]
 
@@ -102,17 +102,17 @@ class TestDetailedScalarContract:
 
     def test_detailed_rejects_array_rates(self) -> None:
         """Documents *why* it's scalar-only: the co/counter-flow check does
-        `if liquid_mass_rate > 0 and ...`, which is ambiguous for arrays."""
+        `if mass_rate_liquid > 0 and ...`, which is ambiguous for arrays."""
         ql = np.array([0.8, 1.0])
         qg = np.array([0.05, 0.06])
         with pytest.raises(ValueError, match="ambiguous"):
-            _beggs_brill_detailed(liquid_mass_rate=ql, gas_mass_rate=qg, **DETAILED_ARGS)
+            _beggs_brill_detailed(mass_rate_liquid=ql, mass_rate_gas=qg, **DETAILED_ARGS)
 
     @pytest.mark.xfail(strict=True, reason="v0.5 roadmap: broadcast rates -> vectorized GradientResult")
     def test_detailed_vectorized_over_rates(self) -> None:
         ql = np.array([0.8, 1.0, 1.2])
         qg = np.array([0.05, 0.06, 0.07])
-        calc = _beggs_brill_detailed(liquid_mass_rate=ql, gas_mass_rate=qg, **DETAILED_ARGS)
+        calc = _beggs_brill_detailed(mass_rate_liquid=ql, mass_rate_gas=qg, **DETAILED_ARGS)
         assert calc["gradient"].total.shape == (3,)
 
 
@@ -122,7 +122,7 @@ class TestGradientScalarContract:
     the limitation and (eventually) the fix."""
 
     def test_gradient_scalar_contract_today(self) -> None:
-        grad = beggs_brill_gradient(liquid_mass_rate=0.8, gas_mass_rate=0.05, **DETAILED_ARGS)
+        grad = beggs_brill_gradient(mass_rate_liquid=0.8, mass_rate_gas=0.05, **DETAILED_ARGS)
 
         for value in grad:
             assert np.ndim(value) == 0
@@ -132,11 +132,11 @@ class TestGradientScalarContract:
         ql = np.array([0.8, 1.0])
         qg = np.array([0.05, 0.06])
         with pytest.raises(ValueError, match="ambiguous"):
-            beggs_brill_gradient(liquid_mass_rate=ql, gas_mass_rate=qg, **DETAILED_ARGS)
+            beggs_brill_gradient(mass_rate_liquid=ql, mass_rate_gas=qg, **DETAILED_ARGS)
 
     @pytest.mark.xfail(strict=True, reason="v0.5 roadmap: broadcast rates -> vectorized GradientResult")
     def test_gradient_vectorized_over_rates(self) -> None:
         ql = np.array([0.8, 1.0, 1.2])
         qg = np.array([0.05, 0.06, 0.07])
-        grad = beggs_brill_gradient(liquid_mass_rate=ql, gas_mass_rate=qg, **DETAILED_ARGS)
+        grad = beggs_brill_gradient(mass_rate_liquid=ql, mass_rate_gas=qg, **DETAILED_ARGS)
         assert grad.total.shape == (3,)

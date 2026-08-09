@@ -125,17 +125,18 @@ def _holdup(
 
 def _beggs_brill_detailed(
     *,
-    liquid_mass_rate: float,
-    gas_mass_rate: float,
-    rho_liquid: float,
-    rho_gas: float,
-    mu_liquid: float,
-    mu_gas: float,
+    mass_rate_liquid: float,
+    mass_rate_gas: float,
+    density_liquid: float,
+    density_gas: float,
+    viscosity_liquid: float,
+    viscosity_gas: float,
     D: float,
     inclination: float = 0.0,
     roughness: float = 1.5e-4,
     sigma: float = 30.0e-3,
-    compressibility: float = 0.0,
+    compressibility_gas: float = 0.0,
+    compressibility_liquid: float = 0.0,
     holdup_adj: float = 1.0,
     payne_correction: bool = True,
 ) -> dict[str, Any]:
@@ -148,12 +149,12 @@ def _beggs_brill_detailed(
 
     Parameters
     ----------
-    liquid_mass_rate, gas_mass_rate : float
+    mass_rate_liquid, mass_rate_gas : float
         Mass rates [kg/s]. Both non-negative; flow direction is resolved
         by the integrator, not here. Negative rates raise ``ValueError``.
-    rho_liquid, rho_gas : float
+    density_liquid, density_gas : float
         Phase densities [kg/m3].
-    mu_liquid, mu_gas : float
+    viscosity_liquid, viscosity_gas : float
         Phase viscosities [Pa.s].
     D : float
         Pipe diameter [m].
@@ -163,8 +164,10 @@ def _beggs_brill_detailed(
         Absolute roughness [m]. Default 0.15 mm.
     sigma : float, optional
         Surface tension [N/m]. Default 30e-3.
-    compressibility : float, optional
-        Mixture compressibility [1/Pa] for the momentum term. Default 0.
+    compressibility_gas, compressibility_liquid : float, optional
+        Phase compressibilities [1/Pa] for the momentum term, weighted by
+        holdup internally (``CLAUDE.md`` #19 — mixture compressibility is
+        computed here, not supplied as a single value). Default 0.
     holdup_adj : float, optional
         Holdup multiplier (result clipped to [0, 1]). Default 1.
     payne_correction : bool, optional
@@ -180,27 +183,27 @@ def _beggs_brill_detailed(
     """
     grad = np.zeros(3)
 
-    if liquid_mass_rate < 0 or gas_mass_rate < 0:
+    if mass_rate_liquid < 0 or mass_rate_gas < 0:
         raise ValueError(
-            f"negative rates not allowed (ql={liquid_mass_rate:.3f} kg/s, "
-            f"qg={gas_mass_rate:.3f} kg/s); flow direction is resolved by "
+            f"negative rates not allowed (ql={mass_rate_liquid:.3f} kg/s, "
+            f"qg={mass_rate_gas:.3f} kg/s); flow direction is resolved by "
             f"the integrator, not physics"
         )
 
-    ql = liquid_mass_rate / rho_liquid
-    qg = gas_mass_rate / rho_gas
+    ql = mass_rate_liquid / density_liquid
+    qg = mass_rate_gas / density_gas
     Cl = ql / (ql + qg)
 
     area = np.pi * D**2 / 4
     v_mix = (ql + qg) / area
 
-    mu_ns = Cl * mu_liquid + (1 - Cl) * mu_gas
-    rho_ns = Cl * rho_liquid + (1 - Cl) * rho_gas
+    mu_ns = Cl * viscosity_liquid + (1 - Cl) * viscosity_gas
+    rho_ns = Cl * density_liquid + (1 - Cl) * density_gas
 
     NFr = froude(v_mix, D) ** 2
     re_ns = reynolds(v_mix, D, rho_ns, mu_ns)
     vsl = ql / area
-    Nlv = vsl * (rho_liquid / (sigma * spc.g)) ** 0.25
+    Nlv = vsl * (density_liquid / (sigma * spc.g)) ** 0.25
 
     i = int(beggs_brill_flowmap(np.asarray(Cl), np.asarray(NFr)))
 
@@ -210,7 +213,7 @@ def _beggs_brill_detailed(
     el = np.clip(el * holdup_adj, 0, 1)
 
     # gravity
-    rho_mix = rho_liquid * el + rho_gas * (1 - el)
+    rho_mix = density_liquid * el + density_gas * (1 - el)
     grad[0] = -rho_mix * inclination * spc.g
 
     # friction (two-phase multiplier over no-slip Fanning factor)
@@ -228,6 +231,7 @@ def _beggs_brill_detailed(
     grad[1] = -2 * f / D * v_mix**2 * rho_ns
 
     # momentum
+    compressibility = el * compressibility_liquid + (1 - el) * compressibility_gas
     eh = compressibility * rho_mix * v_mix**2
     if np.any(eh >= 1):
         raise ValueError("Supersonic flow encountered")
@@ -251,17 +255,18 @@ def _beggs_brill_detailed(
 
 def beggs_brill_gradient(
     *,
-    liquid_mass_rate: float,
-    gas_mass_rate: float,
-    rho_liquid: float,
-    rho_gas: float,
-    mu_liquid: float,
-    mu_gas: float,
+    mass_rate_liquid: float,
+    mass_rate_gas: float,
+    density_liquid: float,
+    density_gas: float,
+    viscosity_liquid: float,
+    viscosity_gas: float,
     D: float,
     inclination: float = 0.0,
     roughness: float = 1.5e-4,
     sigma: float = 30.0e-3,
-    compressibility: float = 0.0,
+    compressibility_gas: float = 0.0,
+    compressibility_liquid: float = 0.0,
     holdup_adj: float = 1.0,
     payne_correction: bool = True,
 ) -> GradientResult:
@@ -269,12 +274,12 @@ def beggs_brill_gradient(
 
     Parameters
     ----------
-    liquid_mass_rate, gas_mass_rate : float
+    mass_rate_liquid, mass_rate_gas : float
         Mass rates [kg/s]. Both non-negative; flow direction is resolved
         by the integrator, not here. Negative rates raise ``ValueError``.
-    rho_liquid, rho_gas : float
+    density_liquid, density_gas : float
         Phase densities [kg/m3].
-    mu_liquid, mu_gas : float
+    viscosity_liquid, viscosity_gas : float
         Phase viscosities [Pa.s].
     D : float
         Pipe diameter [m].
@@ -284,8 +289,9 @@ def beggs_brill_gradient(
         Absolute roughness [m]. Default 0.15 mm.
     sigma : float, optional
         Surface tension [N/m]. Default 30e-3.
-    compressibility : float, optional
-        Mixture compressibility [1/Pa] for the momentum term. Default 0.
+    compressibility_gas, compressibility_liquid : float, optional
+        Phase compressibilities [1/Pa] for the momentum term, weighted by
+        holdup internally (``CLAUDE.md`` #19). Default 0.
     holdup_adj : float, optional
         Holdup multiplier (result clipped to [0, 1]). Default 1.
     payne_correction : bool, optional
@@ -298,17 +304,18 @@ def beggs_brill_gradient(
         sign convention.
     """
     grad = _beggs_brill_detailed(
-        liquid_mass_rate=liquid_mass_rate,
-        gas_mass_rate=gas_mass_rate,
-        rho_liquid=rho_liquid,
-        rho_gas=rho_gas,
-        mu_liquid=mu_liquid,
-        mu_gas=mu_gas,
+        mass_rate_liquid=mass_rate_liquid,
+        mass_rate_gas=mass_rate_gas,
+        density_liquid=density_liquid,
+        density_gas=density_gas,
+        viscosity_liquid=viscosity_liquid,
+        viscosity_gas=viscosity_gas,
         D=D,
         inclination=inclination,
         roughness=roughness,
         sigma=sigma,
-        compressibility=compressibility,
+        compressibility_gas=compressibility_gas,
+        compressibility_liquid=compressibility_liquid,
         holdup_adj=holdup_adj,
         payne_correction=payne_correction,
     )["gradient"]

@@ -59,12 +59,12 @@ D = 0.1                # m
 
 # Valores generados corriendo fluids v1.3.1 localmente (ver
 # docs/session-log.md 2026-08-07 para el script de generación). Formato:
-# (liquid_mass_rate, gas_mass_rate, angle_deg) -> valores esperados de
+# (mass_rate_liquid, mass_rate_gas, angle_deg) -> valores esperados de
 # fluids con acceleration=False, payne_correction=False.
 GOLDEN = {
     "segregated_horizontal": {
-        "liquid_mass_rate": 0.04069 * (np.pi * D**2 / 4) * RHO_LIQUID,
-        "gas_mass_rate": 0.23125 * (np.pi * D**2 / 4) * RHO_GAS,
+        "mass_rate_liquid": 0.04069 * (np.pi * D**2 / 4) * RHO_LIQUID,
+        "mass_rate_gas": 0.23125 * (np.pi * D**2 / 4) * RHO_GAS,
         "angle_deg": 0.0,
         "flow_regime": "segregated",
         "liquid_holdup": (0.48851467545964866, 1e-6),
@@ -73,8 +73,8 @@ GOLDEN = {
         "grad_friction": (-2.3474, 0.015),
     },
     "segregated_downhill": {
-        "liquid_mass_rate": 0.04069 * (np.pi * D**2 / 4) * RHO_LIQUID,
-        "gas_mass_rate": 0.23125 * (np.pi * D**2 / 4) * RHO_GAS,
+        "mass_rate_liquid": 0.04069 * (np.pi * D**2 / 4) * RHO_LIQUID,
+        "mass_rate_gas": 0.23125 * (np.pi * D**2 / 4) * RHO_GAS,
         "angle_deg": -8.0,
         "flow_regime": "segregated",
         "liquid_holdup": (0.1426873926758196, 1e-6),
@@ -83,8 +83,8 @@ GOLDEN = {
         "grad_friction": (-3.3973, 0.015),
     },
     "transition_horizontal": {
-        "liquid_mass_rate": 0.11923 * (np.pi * D**2 / 4) * RHO_LIQUID,
-        "gas_mass_rate": 0.30541 * (np.pi * D**2 / 4) * RHO_GAS,
+        "mass_rate_liquid": 0.11923 * (np.pi * D**2 / 4) * RHO_LIQUID,
+        "mass_rate_gas": 0.30541 * (np.pi * D**2 / 4) * RHO_GAS,
         "angle_deg": 0.0,
         "flow_regime": "transition",
         "liquid_holdup": (0.5674935380966901, 1e-6),
@@ -93,8 +93,8 @@ GOLDEN = {
         "grad_friction": (-9.0300, 0.015),
     },
     "transition_downhill": {
-        "liquid_mass_rate": 0.11923 * (np.pi * D**2 / 4) * RHO_LIQUID,
-        "gas_mass_rate": 0.30541 * (np.pi * D**2 / 4) * RHO_GAS,
+        "mass_rate_liquid": 0.11923 * (np.pi * D**2 / 4) * RHO_LIQUID,
+        "mass_rate_gas": 0.30541 * (np.pi * D**2 / 4) * RHO_GAS,
         "angle_deg": -15.0,
         "flow_regime": "transition",
         "liquid_holdup": (0.07246239792911707, 1e-6),
@@ -103,8 +103,8 @@ GOLDEN = {
         "grad_friction": (-21.8837, 0.015),
     },
     "intermittent_uphill": {
-        "liquid_mass_rate": 1.13998 * (np.pi * D**2 / 4) * RHO_LIQUID,
-        "gas_mass_rate": 3.53123 * (np.pi * D**2 / 4) * RHO_GAS,
+        "mass_rate_liquid": 1.13998 * (np.pi * D**2 / 4) * RHO_LIQUID,
+        "mass_rate_gas": 3.53123 * (np.pi * D**2 / 4) * RHO_GAS,
         "angle_deg": 45.0,
         "flow_regime": "intermittent",
         "liquid_holdup": (0.37651458225699197, 1e-6),
@@ -113,8 +113,8 @@ GOLDEN = {
         "grad_friction": (-698.2258, 0.015),
     },
     "intermittent_vertical": {
-        "liquid_mass_rate": 1.13998 * (np.pi * D**2 / 4) * RHO_LIQUID,
-        "gas_mass_rate": 3.53123 * (np.pi * D**2 / 4) * RHO_GAS,
+        "mass_rate_liquid": 1.13998 * (np.pi * D**2 / 4) * RHO_LIQUID,
+        "mass_rate_gas": 3.53123 * (np.pi * D**2 / 4) * RHO_GAS,
         "angle_deg": 90.0,
         "flow_regime": "intermittent",
         "liquid_holdup": (0.37651458225699197, 1e-6),
@@ -123,8 +123,8 @@ GOLDEN = {
         "grad_friction": (-698.2258, 0.015),
     },
     "distributed_horizontal": {
-        "liquid_mass_rate": 1.41345 * (np.pi * D**2 / 4) * RHO_LIQUID,
-        "gas_mass_rate": 12.00744 * (np.pi * D**2 / 4) * RHO_GAS,
+        "mass_rate_liquid": 1.41345 * (np.pi * D**2 / 4) * RHO_LIQUID,
+        "mass_rate_gas": 12.00744 * (np.pi * D**2 / 4) * RHO_GAS,
         "angle_deg": 0.0,
         "flow_regime": "distributed",
         "liquid_holdup": (0.20901283106906945, 1e-6),
@@ -133,8 +133,8 @@ GOLDEN = {
         "grad_friction": (-2688.8865, 0.015),
     },
     "distributed_uphill": {
-        "liquid_mass_rate": 1.41345 * (np.pi * D**2 / 4) * RHO_LIQUID,
-        "gas_mass_rate": 12.00744 * (np.pi * D**2 / 4) * RHO_GAS,
+        "mass_rate_liquid": 1.41345 * (np.pi * D**2 / 4) * RHO_LIQUID,
+        "mass_rate_gas": 12.00744 * (np.pi * D**2 / 4) * RHO_GAS,
         "angle_deg": 30.0,
         "flow_regime": "distributed",
         "liquid_holdup": (0.20901283106906945, 1e-6),
@@ -162,18 +162,21 @@ def test_golden_vs_fluids_pinned(name: str) -> None:
     """
     case = GOLDEN[name]
     calc = _beggs_brill_detailed(
-        liquid_mass_rate=cast(float, case["liquid_mass_rate"]),
-        gas_mass_rate=cast(float, case["gas_mass_rate"]),
-        rho_liquid=RHO_LIQUID,
-        rho_gas=RHO_GAS,
-        mu_liquid=MU_LIQUID,
-        mu_gas=MU_GAS,
+        mass_rate_liquid=cast(float, case["mass_rate_liquid"]),
+        mass_rate_gas=cast(float, case["mass_rate_gas"]),
+        density_liquid=RHO_LIQUID,
+        density_gas=RHO_GAS,
+        viscosity_liquid=MU_LIQUID,
+        viscosity_gas=MU_GAS,
         D=D,
         inclination=np.sin(np.deg2rad(cast(float, case["angle_deg"]))),
         roughness=ROUGHNESS,
         sigma=SIGMA,
         payne_correction=False,
+
         # compressibility=0.0 (default) -> momentum=0, total=gravity+friction
+        compressibility_gas=0.0,
+        compressibility_liquid=0.0,
     )
 
     logger.info("[%s] flow_regime: calc=%s fluids=%s",
@@ -216,12 +219,12 @@ def test_against_fluids_live(name: str) -> None:
     case = GOLDEN[name]
 
     calc = _beggs_brill_detailed(
-        liquid_mass_rate=cast(float, case["liquid_mass_rate"]),
-        gas_mass_rate=cast(float, case["gas_mass_rate"]),
-        rho_liquid=RHO_LIQUID,
-        rho_gas=RHO_GAS,
-        mu_liquid=MU_LIQUID,
-        mu_gas=MU_GAS,
+        mass_rate_liquid=cast(float, case["mass_rate_liquid"]),
+        mass_rate_gas=cast(float, case["mass_rate_gas"]),
+        density_liquid=RHO_LIQUID,
+        density_gas=RHO_GAS,
+        viscosity_liquid=MU_LIQUID,
+        viscosity_gas=MU_GAS,
         D=D,
         inclination=np.sin(np.deg2rad(cast(float, case["angle_deg"]))),
         roughness=ROUGHNESS,
@@ -229,8 +232,8 @@ def test_against_fluids_live(name: str) -> None:
         payne_correction=False,
     )
 
-    m = cast(float, case["liquid_mass_rate"]) + cast(float, case["gas_mass_rate"])
-    x = cast(float, case["gas_mass_rate"]) / m
+    m = cast(float, case["mass_rate_liquid"]) + cast(float, case["mass_rate_gas"])
+    x = cast(float, case["mass_rate_gas"]) / m
     dp_fluids = fluids_tp.Beggs_Brill(
         m=m, x=x, rhol=RHO_LIQUID, rhog=RHO_GAS, mul=MU_LIQUID, mug=MU_GAS,
         sigma=SIGMA, P=1e5, D=D, angle=case["angle_deg"], roughness=ROUGHNESS,
@@ -259,17 +262,17 @@ def test_holdup_within_physical_bounds() -> None:
     """
     fluids_tp = pytest.importorskip("fluids.two_phase")
 
-    liquid_mass_rate = 0.04069 * (np.pi * D**2 / 4) * RHO_LIQUID
-    gas_mass_rate = 0.23125 * (np.pi * D**2 / 4) * RHO_GAS
+    mass_rate_liquid = 0.04069 * (np.pi * D**2 / 4) * RHO_LIQUID
+    mass_rate_gas = 0.23125 * (np.pi * D**2 / 4) * RHO_GAS
     angle_deg = -30.0
 
     calc = _beggs_brill_detailed(
-        liquid_mass_rate=liquid_mass_rate,
-        gas_mass_rate=gas_mass_rate,
-        rho_liquid=RHO_LIQUID,
-        rho_gas=RHO_GAS,
-        mu_liquid=MU_LIQUID,
-        mu_gas=MU_GAS,
+        mass_rate_liquid=mass_rate_liquid,
+        mass_rate_gas=mass_rate_gas,
+        density_liquid=RHO_LIQUID,
+        density_gas=RHO_GAS,
+        viscosity_liquid=MU_LIQUID,
+        viscosity_gas=MU_GAS,
         D=D,
         inclination=np.sin(np.deg2rad(angle_deg)),
         roughness=ROUGHNESS,
@@ -283,8 +286,8 @@ def test_holdup_within_physical_bounds() -> None:
     # Confirmar que fluids efectivamente da negativo con estos inputs (si
     # esto empieza a fallar, fluids cambió de comportamiento y el caso ya
     # no sirve como guard -- hay que buscar otro).
-    m = liquid_mass_rate + gas_mass_rate
-    x = gas_mass_rate / m
+    m = mass_rate_liquid + mass_rate_gas
+    x = mass_rate_gas / m
     qg, ql = x * m / RHO_GAS, (1 - x) * m / RHO_LIQUID
     area = np.pi * D**2 / 4
     Vsl, Vsg = ql / area, qg / area

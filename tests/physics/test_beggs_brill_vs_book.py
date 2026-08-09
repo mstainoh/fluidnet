@@ -20,8 +20,8 @@ def test_kermit_brown_example_4_7() -> None:
 
     sigma = 8.41e-3
     eps = 6e-6 * SPC.foot
-    mu_liquid = 0.97e-3
-    mu_gas = 0.016e-3
+    viscosity_liquid = 0.97e-3
+    viscosity_gas = 0.016e-3
     Bo = 1.197
     Bg = 0.0091
     Rs = 281 * SPC.foot**3 / SPC.barrel
@@ -30,19 +30,19 @@ def test_kermit_brown_example_4_7() -> None:
     dgs_free = 0.70 * 1.225
     dgs_diss = 0.88 * 1.225
 
-    rho_liquid = (dos + dgs_diss * Rs) / Bo
-    rho_gas = dgs_free / z * (288.15 / T) * (P / SPC.atm)
+    density_liquid = (dos + dgs_diss * Rs) / Bo
+    density_gas = dgs_free / z * (288.15 / T) * (P / SPC.atm)
 
     qo = qos * Bo
     qg = (qgs - qos * Rs) * Bg
 
     calc = _beggs_brill_detailed(
-        liquid_mass_rate=qo * rho_liquid,
-        gas_mass_rate=qg * rho_gas,
-        rho_liquid=rho_liquid,
-        rho_gas=rho_gas,
-        mu_liquid=mu_liquid,
-        mu_gas=mu_gas,
+        mass_rate_liquid=qo * density_liquid,
+        mass_rate_gas=qg * density_gas,
+        density_liquid=density_liquid,
+        density_gas=density_gas,
+        viscosity_liquid=viscosity_liquid,
+        viscosity_gas=viscosity_gas,
         D=D,
         inclination=1.0,
         roughness=eps,
@@ -92,12 +92,12 @@ def test_kermit_brown_example_4_7() -> None:
 def test_checalc_case_no_payne() -> None:
     """checalc.com Beggs & Brill sample (no Payne correction)."""
     calc = _beggs_brill_detailed(
-        liquid_mass_rate=4.75 / SPC.hour * 613.8,
-        gas_mass_rate=9 / SPC.hour * 141.3,
-        rho_liquid=613.8,
-        rho_gas=141.3,
-        mu_liquid=0.5e-3,
-        mu_gas=0.02e-3,
+        mass_rate_liquid=4.75 / SPC.hour * 613.8,
+        mass_rate_gas=9 / SPC.hour * 141.3,
+        density_liquid=613.8,
+        density_gas=141.3,
+        viscosity_liquid=0.5e-3,
+        viscosity_gas=0.02e-3,
         D=50e-3,
         inclination=np.sin(np.deg2rad(90)),
         roughness=0.0018e-3,

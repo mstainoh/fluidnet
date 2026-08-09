@@ -25,6 +25,62 @@
 
 ---
 
+## 2026-08-09 — código: firma de B&B por fase
+
+> Continuación directa del "Próximo paso" de la sesión de diseño del mismo
+> día: aplicar la convención de sufijos de fase (`CLAUDE.md` #19) a
+> `beggs_brill_gradient`/`_beggs_brill_detailed`.
+
+**Cerrado:**
+
+- **Renombrado completo a `{propiedad}_{fase}` en la firma de B&B**, en
+  `_beggs_brill_detailed` y `beggs_brill_gradient` (`src/fluidnet/physics/multiphase/beggs_brill.py`):
+  - `rho_liquid`/`rho_gas` → `density_liquid`/`density_gas`
+  - `mu_liquid`/`mu_gas` → `viscosity_liquid`/`viscosity_gas`
+  - `gas_compressibility`/`liquid_compressibility` → `compressibility_gas`/
+    `compressibility_liquid` (estaban en orden `fase_propiedad`, invertido
+    respecto a la convención recién cerrada — corregido de paso, no era
+    parte del pedido original pero contradecía #19 directamente).
+  - `liquid_mass_rate`/`gas_mass_rate` → `mass_rate_liquid`/`mass_rate_gas`
+    (mismo criterio de consistencia: todo kwarg de fase sigue
+    `{propiedad}_{fase}`, sin excepción para los rates).
+  - Variables internas (`rho_ns`, `rho_mix`, `mu_ns`) **no** se tocaron: no
+    son parte del contrato público, son locals de mezcla que ya calcula
+    `physics` (coherente con #19 — el `StateModel` entrega por fase, la
+    mezcla la computa `physics`).
+- Docstrings (`Parameters`) de ambas funciones actualizadas con los nombres
+  nuevos; nota agregada en `compressibility_gas`/`compressibility_liquid`
+  aclarando que la ponderación por holdup es interna (no se recibe un valor
+  de mezcla).
+- Tests actualizados con el mismo mapeo de nombres: `test_beggs_brill_vs_fluids.py`,
+  `test_beggs_brill_vs_book.py`, `test_multiphase_vector_1.py`.
+- `python -m pytest tests/physics/` verde (incluidos los 2 `xfail(strict=True)`
+  de vectorización, sin regresiones) y `python -m mypy` limpio tras el cambio.
+- Cierra el ítem `physics-single-multiphase.md` §4 ("Firma por fase de
+  `compressibility` — pendiente") y el "Próximo paso" de la sesión de diseño
+  2026-08-09 de arriba.
+
+**Abierto:**
+
+- **Issue de GitHub "B&B — firma por fase de `compressibility`" (milestone
+  v0.2): nunca se creó** (`gh` no disponible en la sesión de diseño previa;
+  quedó anotado como pendiente de creación manual). Con el cambio ya
+  implementado y verde, no tiene sentido crearla ahora solo para cerrarla —
+  si en algún momento se quiere el registro en GitHub, se puede crear
+  directamente como cerrada (o simplemente omitir, ya que este log cumple
+  la misma función de trazabilidad).
+- Sin cambios en los demás ítems abiertos de la sesión de diseño: forma de
+  `FluidState` bajo fases, nombre del `Protocol` neutro, resto de
+  `ROADMAP §Abiertas`.
+
+**Próximo paso:**
+
+- Cerrar la forma de `FluidState` bajo la convención de fases y el nombre
+  concreto del `Protocol` neutro (`StateModel`/`Medium`/`ConstitutiveModel`);
+  recién ahí, diseño del caso demo (wellfield sintético).
+
+---
+
 ## 2026-08-09 — diseño: contrato de `LossFunc` y `StateModel`
 
 > Pregunta de la sesión: cerrar el contrato de `loss_func` y la relación
