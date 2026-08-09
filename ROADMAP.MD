@@ -82,6 +82,39 @@ abandonar la propagación topológica.
 
 ---
 
+## Scope formal del dominio de problemas
+
+Lo que fluidnet resuelve, dicho con precisión: redes donde hay un
+**potencial medido en los nodos** (*across*), un **flujo medido en los ejes**
+(*through*), y una relación constitutiva **monótona** entre ambos, expresable
+como
+
+```
+Δ = ∫ f(P, x, edge_attrs, node_attrs) dx
+```
+
+Es decir, un grafo lineal / bond graph con elementos disipativos. El caso
+algebraico es el degenerado: si `P` no entra en el integrando, éste es
+constante y la integral colapsa a `grad × L`.
+
+**Dos niveles de garantía, que conviene no confundir:**
+
+- **Lipschitz** → existencia y unicidad de la solución de la ODE *en el eje*.
+- **Content de Millar** → existencia y unicidad del *problema de red*, bajo
+  constitutivas monótonas.
+
+**Fuera de scope, como límite matemático declarado y no como limitación de
+implementación**: histéresis, relaciones implícitas no reducibles a una ODE,
+y elementos activos (rompen la monotonía global — de ahí que estén en v2.0 y
+sean un problema más duro que el loop pasivo).
+
+Esto va al README con esta forma. El límite del proyecto **no es "fluidos" ni
+"DAG"**: es "relaciones constitutivas monótonas expresables como ODE en la
+coordenada del eje". Un límite declarado se lee como criterio de ingeniería;
+"todavía no está implementado" se lee como inmadurez.
+
+---
+
 ## Capa 0 — `physics/` · COMPLETADA
 
 **Qué prueba:** que la física está validada de forma independiente de la
@@ -226,6 +259,10 @@ usar. Es el punto de submit a JOSS y **el diferencial del proyecto**.
 - **Fin del freeze de correlaciones**: modelos de holdup no-slip (`Hl = Cl`) y
   constant-slip, como baseline y puente pedagógico hacia B&B. *Diferidos desde
   `physics-single-multiphase.md` §5.*
+- **Convención de sufijos de fase aplicada a las correlaciones nuevas**
+  (no-slip, constant-slip): propiedades por fase desde el `StateModel`,
+  mezcla calculada en `physics`. La firma de B&B se corrige antes, en la
+  sesión de código inmediata.
 - Docs formales: docstrings numpy · Sphinx/mkdocs en GitHub Pages ·
   2-3 ejemplos reproducibles (uno de calibración contra observaciones sintéticas).
 - Empaquetado PyPI real + CHANGELOG + versionado semántico.
@@ -280,8 +317,13 @@ completa — la composición propagada determina las propiedades locales.
   nodo/edge, consumidos por las leyes constitutivas de edge. Aditivo: el solver
   pasa `T` donde antes pasaba `None`, sin cambio de protocolo. Solving térmico
   acoplado queda fuera.
-- Extensiones de ejemplo, **fuera del core**: `BrineRate` (composición iónica →
-  saturation indices, mezcla de salmueras), `MultiphaseRate` (fracciones).
+- Extensiones de ejemplo, **fuera del core**: `BrineRate` (composición iónica
+  → saturation indices, mezcla de salmueras).
+  *(`MultiphaseRate` con fracciones se retira: el split líquido/gas depende de
+  un flash `(P, T, comp)` y cambia a lo largo del caño — es trabajo de EOS, o
+  sea del `StateModel`, no del `Rate`. Lo que queda es un `StateModel`
+  degenerado de fracción impuesta, que es una hipótesis explícita de
+  modelado. 2026-08-09.)*
 
 ---
 
@@ -377,6 +419,27 @@ circuitos cerrados: hidráulica de edificios, procesos con recirculación.
   `t_span=(L, 0)`).
 - **Módulo `fluidnet/fluid.py` en singular**, no `fluids.py` — colisión visual
   con `fluids` (ChEDL). *(2026-08-07)*
+- **Scope formal del dominio: across en nodos, through en ejes,
+  constitutiva monótona tipo ODE.** Lipschitz garantiza la ODE del eje;
+  Millar, el problema de red. Fuera de scope declarado: histéresis,
+  relaciones implícitas, elementos activos. *(2026-08-09)*
+- **Contrato de `LossFunc`: `solve_dp` abstracto + `solve_rate` con
+  `NotImplementedError`.** Las dos direcciones de integración no son modos
+  distintos (es el signo del `t_span`). `AlgebraicLoss` es el degenerado de
+  `IntegralLoss`. *(2026-08-09)*
+- **`StateModel` como `Protocol` neutro, `Fluid` lo implementa**; cadena
+  anidada `comp → T → P`; `temperature` no asciende al protocolo.
+  *(2026-08-09)*
+- **Convención de sufijos de fase**: el `StateModel` entrega por fase, la
+  mezcla la calcula `physics`. Revierte la unificación
+  `mix_compressibility → compressibility` para multifásico. *(2026-08-09)*
+- **Vocabulario canónico en vez de tabla de renombres**; `loss_func` compone,
+  no traduce. *(2026-08-09)*
+- **Composición trivial de `ScalarRate`: atributo de subclase, no de clase.**
+  ← cierra el ítem abierto desde 2026-08-07. *(2026-08-09)*
+- **`as_physics_kwargs()` vive en `Rate`** (lo extensivo siempre va a la
+  loss); se arma una vez por eje, fuera del `solve_ivp`. ← cierra el ítem
+  abierto desde 2026-08-07. *(2026-08-09)*
 
 ### Abiertas
 
@@ -391,13 +454,6 @@ circuitos cerrados: hidráulica de edificios, procesos con recirculación.
   A evaluar al diseñar el caso demo (Secuencia inmediata #2), aunque sea para
   descartarlo por tiempo.
 
-- **Forma de la composición trivial en `ScalarRate`** — ¿vacía, o un singleton
-  tipo `{"fluid": 1.0}` para que el álgebra de mezcla sea uniforme entre
-  `ScalarRate` y `BrineRate`? Bloquea la firma final de `__add__`.
-- **`as_physics_kwargs()`** — dónde vive el adaptador que traduce
-  `(Rate, FluidState, edge_attrs)` a los kwargs exactos de cada función de
-  gradiente. Candidato natural: la `loss_func`, única capa que ve las tres cosas
-  a la vez.
 - **Acoplamiento composición↔propiedades en `mass_balance` (v1.5).** Con
   composición fija el problema hidráulico es convexo (content de Millar):
   solución única bajo losses monótonas. Cuando las propiedades dependen de la
@@ -422,3 +478,21 @@ circuitos cerrados: hidráulica de edificios, procesos con recirculación.
   Misma pregunta para dónde vive `FluidState`.
 - Port fino del solver 3: revisar `header_network_optimizer.py` y
   `network_observations.py` de mineplanner.
+- **Forma de `FluidState` bajo la convención de fases.** Consecuencia directa
+  de la decisión de sufijos: el estado no puede ser genéricamente escalar.
+  Dirección propuesta, **no cerrada**: subclases `SinglePhaseState` (escalar)
+  y `MultiPhaseState` (vectorial + dict de nombres `_liquid`/`_gas`), con el
+  parseo a kwargs del lado del estado. Sub-pregunta: si ese parseo es método
+  del estado o de `loss_func` — "`loss_func` compone" empuja a lo segundo,
+  pero quién sabe cuántas fases hay es el estado. Toca `CLAUDE.md` #5.
+- **Nombre concreto del `Protocol` neutro** (`StateModel` / `Medium` /
+  `ConstitutiveModel`) — fijar antes de que aparezca en firmas públicas.
+- **Jacobiano sparse estructural en `mass_balance`.** Es la matriz de
+  incidencia, conocida de antemano; pasársela a `scipy.optimize.root` es O(1)
+  bloque vs. O(E) evaluaciones por iteración de la estimación por diferencias
+  finitas. Pesa más en redes chicas.
+- **Anidación de métodos numéricos.** Resolver por presión da tres niveles
+  (integral `dp` vs. `Q` → solver `Q = f(P)` → solver de balance). Es
+  matemático, no computacional. v0.2 = 1 nivel; v1.0 forward + `IntegralLoss`
+  = 2; 3 sólo en `mass_balance` + `IntegralLoss` + BC que exijan inversión.
+  El peor caso no está en el camino a JOSS.

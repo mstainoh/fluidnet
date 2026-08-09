@@ -25,6 +25,182 @@
 
 ---
 
+## 2026-08-09 — diseño: contrato de `LossFunc` y `StateModel`
+
+> Pregunta de la sesión: cerrar el contrato de `loss_func` y la relación
+> `Rate` ↔ modelo de propiedades. Derivó en la formalización del scope
+> matemático del dominio de problemas — la definición que va al README.
+
+**Cerrado:**
+
+- **Contrato de `LossFunc`: dos métodos, no tres modos.**
+  `solve_dp(rate, state, **edge_attrs) -> dp` abstracto;
+  `solve_rate(dp, state, **edge_attrs) -> rate` en el protocolo integral con
+  `NotImplementedError` por default. Las direcciones `Q→P1→P2` y `Q→P2→P1`
+  **no son modos distintos**: es el signo del `t_span`, ya cerrado como
+  responsabilidad del integrador (2026-08-04). Los ejes ortogonales reales
+  son: régimen algebraico/integral (lo declara el `StateModel`) × cuál es la
+  incógnita (`dp` o `rate`).
+  Rationale de `NotImplementedError` en vez de un default por root-find:
+  declara la capacidad en el vocabulario del protocolo y habilita **resolver
+  la red sobre campo de potenciales** — no es el régimen de fluidos, pero sí
+  el natural de otros dominios. Generalidad barata, sin imponer un Newton
+  heredado a toda loss.
+
+- **Scope formal del dominio de problemas.** Potencial en nodos (*across*),
+  flujo en ejes (*through*), relación constitutiva **monótona** expresable
+  como `Δ = ∫ f(P, x, edge_attrs, node_attrs) dx`. Es un grafo lineal /
+  bond graph con elementos disipativos.
+  **Dos niveles de garantía, no confundirlos**: Lipschitz da
+  existencia/unicidad de la ODE *en el eje*; el content de Millar la da del
+  *problema de red*.
+  Fuera de scope, declarado como **límite matemático y no de
+  implementación**: histéresis, relaciones implícitas no reducibles a ODE,
+  elementos activos (rompen la monotonía — por eso v2.0, y son un problema
+  más duro que el loop pasivo).
+  Consecuencia para el README: el límite del proyecto no es "fluidos" ni
+  "DAG", es **"constitutivas monótonas expresables como ODE en la coordenada
+  del eje"**. Un límite declarado se lee como criterio; "todavía no lo
+  implementé" se lee como inmadurez.
+
+- **`AlgebraicLoss` es el caso degenerado de `IntegralLoss`, no otra física.**
+  Si `P` no entra en el integrando, éste es constante y la integral colapsa a
+  `grad × L`. Coherente con que el discriminante sea `β == 0`, valor de
+  runtime del `StateModel`. Rationale de mantener los dos protocolos: **no
+  tiene sentido formular una ODE cuando la solución analítica existe y es
+  simple de poner en código.** (Argumento académico, no de performance —
+  corrige una formulación previa de esta sesión.)
+
+- **`StateModel`: `Protocol` de nombre neutro; `Fluid` lo implementa.**
+  Definición: transforma la variable *across* del nodo (más el estado
+  propagado) en los argumentos de la función de gradiente. Fluidos:
+  `(comp, T, P) → (ρ, μ, β, σ)`. AC: `(V) → impedancia`.
+  **La cadena es anidada `comp → T → P`, no una tupla plana**: fijadas la
+  composición y `T`, la parcial que queda es sólo función de `P` — que es lo
+  que hace prolija la formulación de la ODE (una sola variable independiente
+  en el integrando).
+  **`temperature` NO asciende al `Protocol`**: lo contamina (en el demo AC no
+  significa nada) y puede complicar la existencia. Queda en la firma de
+  `Fluid`, que es donde ya estaba.
+  Motivo del nombre neutro: `Fluid` en la firma del protocolo es evidencia
+  *en contra* del diferencial physics-agnostic, justo en la fila más débil de
+  la tabla de diferenciales. Costo de arreglarlo ahora: un `Protocol`. Costo
+  después: romper firma pública.
+
+- **Convención de sufijos de fase. `StateModel` entrega propiedades por fase;
+  toda propiedad de mezcla es cómputo de `physics`.**
+  `density_gas` / `density_liquid`, etc.; monofásico usa el nombre pelado.
+  Razón: la compresibilidad de mezcla se pondera por holdup, y el holdup lo
+  calcula B&B — el `StateModel` no puede entregarla porque no conoce el
+  holdup. La línea de corte tiene que quedar fijada **antes** de que entre la
+  segunda correlación (v0.5, fin del freeze), porque es exactamente donde se
+  rompería.
+
+- **Vocabulario canónico, no tabla de renombres.** Los nombres de `physics`
+  son contrato. `loss_func` arma `{**rate_kwargs, **state_kwargs,
+  **edge_attrs}` y filtra por `signature(gradient_fn)`. Un dict de override
+  sólo donde un modelo tenga razón genuina para desviarse: un dict identidad
+  es ritual, y una tabla que crece con cada modelo se desincroniza en
+  silencio (el kwarg no pasa, entra un default, y revienta lejos del origen).
+  Contrato de entrega: **nombre canónico + valor en SI**; `physics` maneja
+  los números. Consecuencia buscada: `loss_func` queda como un `solve_ivp`
+  wrappeando `physics`, replicable modelo a modelo.
+
+- **`loss_func` compone, no traduce.** La aridad multifásica no es renaming
+  sino cómputo: `Rate` aporta el extensivo, `StateModel` la fracción de fase,
+  el producto da los rates por fase.
+
+- **Definición de `Rate` por contrato, no por contenido**: *puedo sumarme con
+  otros y dar balance cero, y puedo meterme en una loss func.* Eso es todo.
+  Es lo que hace que `ComplexRate` entre sin tocar el álgebra.
+
+- **Composición trivial de `ScalarRate`: atributo de subclase, no de clase.**
+  ← cierra el ítem que venía abierto desde 2026-08-07 (a).
+  `ScalarRate` **no tiene** el campo; no lo tiene vacío. La uniformidad va en
+  el método, no en el dato. Un singleton `{"fluid": 1.0}` obligaría a iterar
+  dict + división ponderada por nodo en el caso monofásico, que es el loop
+  interno del optimizer de v0.5, y no vectoriza.
+
+- **`as_physics_kwargs` se arma una vez por eje, fuera del `solve_ivp`.** Lo
+  licencia que en steady-state sin intercambio de masa el mass rate sea
+  constante a lo largo del eje. El RHS sólo actualiza `pressure`. Sin esto,
+  con 10²–10³ evaluaciones del RHS por eje, el overhead del wrapper deja de
+  ser despreciable.
+
+- **Conversión de unidades fuera del contrato de `LossFunc`** — atributo de
+  `Network`, capa de I/O. Mantiene la decisión #1 (SI estricto) como real y
+  no nominal: es de las cosas que un reviewer chequea leyendo una firma.
+
+**Cambiado:**
+
+- **`as_physics_kwargs()` — ubicación afinada, no movida del todo.** El
+  método **existe en `Rate`**: lo extensivo va a la loss function sí o sí.
+  Lo que se movió a `loss_func` es la *composición con la fracción de fase*,
+  no el acceso al extensivo. Una formulación previa de esta sesión colapsaba
+  mal las dos cosas.
+- **`MultiphaseRate` (fracciones) sale del roadmap** (`ROADMAP §v1.5` lo
+  listaba como extensión de ejemplo). El split líquido/gas depende de un
+  flash `(P, T, comp)` y cambia a lo largo del caño: es trabajo de EOS, no
+  del rate. Lo que queda es un `StateModel` degenerado de fracción impuesta
+  (usuario que declara "asumo 30 % vapor fijo") — hipótesis de modelado
+  explícita y válida, pero es un fluido, no un rate.
+- **`CLAUDE.md` #6 acotada**: `temperature` en la firma sigue válida para
+  `Fluid`; no asciende al `Protocol` neutro.
+- **`physics-single-multiphase.md` §1 queda contradicha** por la convención
+  de sufijos: documenta la unificación `mix_compressibility →
+  compressibility` como deliberada. Resolvía un problema real de su momento,
+  pero elige el nombre equivocado bajo la regla nueva. Hay que corregir el
+  ADR, no sólo el código.
+
+**Abierto:**
+
+- **Forma de `FluidState` / `StateState` bajo la convención de fases.**
+  Consecuencia directa de la decisión de sufijos: `FluidState` **no puede ser
+  genéricamente escalar**. Dirección propuesta (no cerrada): dividir en
+  subclases `SinglePhaseState` (escalar) y `MultiPhaseState` (vectorial, con
+  su dict de nombres `_liquid`/`_gas`), y que el parseo a kwargs lo haga el
+  propio estado. Sub-pregunta abierta: si ese parseo es un método del
+  `StateModel`/estado o queda del lado de `loss_func` — la decisión de que
+  "`loss_func` compone" empuja hacia lo segundo, pero el conocimiento de
+  cuántas fases hay vive en el estado. **Toca `CLAUDE.md` #5** (`FluidState`
+  como `NamedTuple` de campos escalares requeridos).
+- **Nombre concreto del `Protocol` neutro** (`StateModel` / `Medium` /
+  `ConstitutiveModel`) — fijarlo antes de que aparezca en firmas públicas.
+- **Jacobiano sparse estructural en `mass_balance`**: es la matriz de
+  incidencia, conocida de antemano. Pasársela a `scipy.optimize.root` en vez
+  de dejar que la estime por diferencias finitas es O(1) bloque vs. O(E)
+  evaluaciones por iteración; pesa más en redes chicas. Diferido, no
+  discutido en profundidad.
+- **Anidación de métodos numéricos.** Resolver por presión da *tres* niveles:
+  integral para `dp` vs. `Q`, solver para `Q = f(P)`, solver de balance de
+  red. Es un problema matemático, no computacional. Conteo por etapa: v0.2 =
+  1 nivel; v1.0 forward + `IntegralLoss` = 2 (no hace falta invertir por
+  eje); 3 sólo en `mass_balance` + `IntegralLoss` + BC que exijan inversión.
+  **El peor caso no está en el camino a JOSS.** Estrategias, más adelante.
+- Los ítems previos sin cambios: mecanismo del canal `@diagnostic`,
+  ubicación de `GradientResult`.
+
+**Próximo paso:**
+
+- Sesión de **código**: cambiar la firma de B&B — sacar `compressibility`,
+  recibir `compressibility_gas` / `compressibility_liquid`, ponderación por
+  holdup interna. Toca `test_beggs_brill_vs_fluids.py` y
+  `test_beggs_brill_vs_book.py`, y corregir `physics-single-multiphase.md`
+  §1 (que hoy documenta la unificación como decisión vigente). Mecánico,
+  pero es lo que fija la convención de fases antes de la segunda correlación.
+- Después: cerrar la forma de `FluidState` bajo fases y el nombre del
+  `Protocol`; recién ahí, diseño del caso demo.
+
+**Pendiente (higiene, no bloquea código):**
+
+- **Issue de GitHub "B&B — firma por fase de `compressibility`" (milestone
+  v0.2), sin crear.** `gh` no está disponible en el entorno de esta sesión;
+  queda para creación manual desde la web. El work item en sí ya está
+  documentado (ver "Próximo paso" arriba y `physics-single-multiphase.md`
+  §4), así que no bloquea la sesión de código.
+
+---
+
 ## 2026-08-07 — diseño (b): secuencia de etapas
 
 > Continuación de la sesión (a) del mismo día. Surgió al discutir la tensión

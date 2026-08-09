@@ -77,13 +77,15 @@ Rate ──► composición (intensiva)
    - **Recibe la composición como dato crudo** (mapping / array), **nunca un
      objeto `Rate`**. Si recibiera el `Rate` dejaría de ser capa cero.
    - `physics/` nunca ve `T` ni composición: recibe propiedades ya evaluadas.
-5. **`FluidState` = `NamedTuple(density, viscosity, compressibility, sigma)`,
-   todos los campos requeridos.** Nada de `float | None`. `β = 0` es el valor
-   físico exacto del agua, no una ausencia (ver la nota de `compressibility`
-   como estado, no flag). Un `sigma=None` filtrándose a B&B es el mismo
-   problema que un default físico invisible, y rompe el filtrado de kwargs
-   por `signature`. Un fluido monofásico puede levantar `NotImplementedError`
-   en `sigma` si se quiere ser explícito — pero no devolver `None`.
+5. **`FluidState` con todos los campos requeridos, nunca `float | None`.**
+   `β = 0` es el valor físico exacto del agua, no una ausencia. Un
+   `sigma=None` filtrándose a B&B es el mismo problema que un default físico
+   invisible, y rompe el filtrado de kwargs por `signature`.
+   ⚠️ **La forma concreta está reabierta** (sesión 2026-08-09): bajo la
+   convención de sufijos de fase (#19) el estado no puede ser genéricamente
+   escalar. Dirección propuesta, **no cerrada**: subclases
+   `SinglePhaseState` (escalar) / `MultiPhaseState` (vectorial + dict de
+   nombres `_liquid`/`_gas`). No implementar hasta que cierre.
 6. **`temperature` en la firma desde v0.2, default `None` = "no
    suministrado", nunca un valor implícito.** Todo fluido es en general
    función de `(P, T)`; se deja opcional para los casos en que `T` es
@@ -97,6 +99,10 @@ Rate ──► composición (intensiva)
    Consecuencia: v2 (perfiles de temperatura prescritos) es aditivo — el
    solver pasa `T` desde un atributo de nodo/edge en vez de `None`. Cero
    cambio de protocolo.
+   **Alcance acotado (2026-08-09)**: esto vale para `Fluid`, **no** para el
+   `Protocol` neutro `StateModel` (#18). `T` no asciende al protocolo: lo
+   contamina — en el demo eléctrico AC no significa nada — y puede complicar
+   la existencia de la solución.
 7. **El régimen `AlgebraicLoss`/`IntegralLoss` lo declara el `Fluid`**, no el
    usuario al registrar la loss ni un chequeo del solver. El `Fluid` es dueño
    del EOS, así que es el único que sabe si `∂ρ/∂P = 0`. Un fluido
@@ -153,6 +159,72 @@ Rate ──► composición (intensiva)
     losses monótonas sigue siendo un problema convexo con solución única
     (content de Millar). Loops llegan en v2.0. Al escribir docs o README, no
     presentar DAG como una propiedad del dominio.
+18. **`StateModel`: `Protocol` de nombre neutro; `Fluid` lo implementa.**
+    Transforma la variable *across* del nodo (más el estado propagado) en los
+    argumentos de la función de gradiente. Fluidos: `(comp, T, P) → (ρ, μ, β,
+    σ)`. Eléctrico AC: `(V) → impedancia`.
+    La cadena es **anidada `comp → T → P`**, no una tupla plana: fijadas
+    composición y `T`, la parcial restante es sólo función de `P` — una sola
+    variable independiente en el integrando, que es lo que hace prolija la
+    ODE.
+    Motivo: `Fluid` en la firma del protocolo es evidencia *en contra* del
+    diferencial physics-agnostic, que es la fila más débil de la tabla del
+    ROADMAP. *(Nombre concreto del protocolo: pendiente.)*
+19. **Convención de sufijos de fase. El `StateModel` entrega propiedades por
+    fase; toda propiedad de mezcla es cómputo de `physics`.**
+    `density_gas` / `density_liquid` / `compressibility_gas` /
+    `compressibility_liquid`; monofásico usa el nombre pelado
+    (`density`, `compressibility`).
+    Razón: la compresibilidad de mezcla se pondera por holdup, y el holdup lo
+    calcula la correlación — el `StateModel` no puede entregarla porque no
+    conoce el holdup.
+    **Esto revierte la unificación `mix_compressibility → compressibility`**
+    del commit `7142191` para el caso multifásico. Aquella decisión resolvía
+    un problema real (emitir una sola clave sin ramificar por modelo) pero
+    elige el nombre equivocado bajo esta regla. El filtrado por `signature`
+    sigue funcionando sin tabla: cada gradiente declara qué necesita.
+20. **Contrato de `LossFunc`: dos métodos.**
+    `solve_dp(rate, state, **edge_attrs) -> dp` abstracto;
+    `solve_rate(dp, state, **edge_attrs) -> rate` en el protocolo integral con
+    `NotImplementedError` por default (habilita resolver la red sobre campo
+    de potenciales — no es el régimen de fluidos, sí el de otros dominios).
+    Las direcciones `Q→P1→P2` y `Q→P2→P1` **no son modos distintos**: es el
+    signo del `t_span` (decisión 2026-08-04). Ejes ortogonales reales:
+    régimen algebraico/integral × cuál es la incógnita.
+    `AlgebraicLoss` es el **caso degenerado** de `IntegralLoss` (sin `P` en el
+    integrando, la integral colapsa a `grad × L`); se mantienen los dos
+    protocolos porque no tiene sentido formular una ODE cuando la solución
+    analítica existe y es simple de codificar.
+21. **Vocabulario canónico, no tabla de renombres.** Los nombres de `physics`
+    son contrato. `loss_func` arma `{**rate_kwargs, **state_kwargs,
+    **edge_attrs}` y filtra por `signature(gradient_fn)`. Dict de override
+    **sólo** ante una razón genuina de desviarse: un dict identidad es
+    ritual, y una tabla que crece con cada modelo se desincroniza en silencio
+    (el kwarg no pasa, entra un default, revienta lejos del origen). Contrato
+    de entrega: nombre canónico + valor en SI. **`loss_func` compone, no
+    traduce**: la aridad multifásica es cómputo (`Rate` da el extensivo,
+    `StateModel` la fracción, el producto da los rates por fase).
+22. **`Rate` se define por contrato, no por contenido**: *puedo sumarme con
+    otros y dar balance cero, y puedo meterme en una loss func.*
+    - `as_physics_kwargs()` **sí existe** en `Rate` — lo extensivo va a la
+      loss function siempre. Lo que vive en `loss_func` es la composición con
+      la fracción de fase, no el acceso al extensivo.
+    - **La composición es atributo de subclase, no de clase.** `ScalarRate`
+      no tiene el campo; no lo tiene vacío. Uniformidad en el método, no en
+      el dato: un singleton `{"fluid": 1.0}` obligaría a iterar dict +
+      división ponderada por nodo en el loop interno del optimizer de v0.5, y
+      no vectoriza.
+    - **`as_physics_kwargs` se arma una vez por eje, fuera del `solve_ivp`.**
+      Lo licencia que en steady-state el mass rate sea constante a lo largo
+      del eje; el RHS sólo actualiza `pressure`.
+    - **No existe `MultiphaseRate` con fracciones.** El split líquido/gas
+      depende de un flash `(P, T, comp)` y cambia a lo largo del caño: es
+      trabajo de EOS. Un `StateModel` de fracción impuesta es válido como
+      hipótesis explícita de modelado, pero es un fluido, no un rate.
+23. **Conversión de unidades fuera del contrato de `LossFunc`** — atributo de
+    `Network`, capa de I/O. Si `loss_func` convierte, la decisión #1 (SI
+    estricto) se vuelve nominal, y es de las que un reviewer chequea leyendo
+    una firma.
 
 ## Convenciones de testing (capa physics)
 

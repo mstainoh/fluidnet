@@ -18,19 +18,28 @@
   mismo contrato — comparten `GradientResult` con `multiphase`, lo que
   permite que un solver trate ambos casos de forma uniforme aguas abajo.
 
-**`compressibility` es estado, no flag.** Es β = (1/ρ)(∂ρ/∂P)_T en 1/Pa,
-una propiedad física del fluido — no un switch que activa o desactiva un
-modo de cálculo. Entra en el término de aceleración (momentum) vía
-`dP/dx = (grav + fric) / (1 − ρv²β)`: `β = 0` es el valor físico exacto de
-un líquido incompresible, no una aproximación ni un caso especial. En
-`beggs_brill_gradient` es el mismo concepto para la mezcla (ponderada por
-holdup); el parámetro se llamaba `mix_compressibility` hasta que se unificó
-a `compressibility` en el refactor kw-only (commit `7142191`, 2026-08-04) —
-mismo nombre que en `single_phase_gradient`, a propósito, para que el
-futuro adaptador `Rate` → `physics` pueda emitir una sola clave sin
-ramificar por modelo. (Ver también la nota sobre régimen algebraico/integral
-en `architecture-v0.2.md` §2.2: `compressibility == 0` es justamente el
-discriminador de runtime entre los dos protocolos de loss.)
+**`compressibility` es estado, no flag.** Es β = (1/ρ)(∂ρ/∂P)_T en 1/Pa, una
+propiedad física del fluido — no un switch que activa o desactiva un modo de
+cálculo. Entra en el término de aceleración (momentum) vía
+`dP/dx = (grav + fric) / (1 − ρv²β)`: `β = 0` es el valor físico exacto de un
+líquido incompresible, no una aproximación ni un caso especial. (Ver también
+la nota sobre régimen algebraico/integral en `architecture-v0.2.md` §2.2:
+`compressibility == 0` es el discriminador de runtime entre los dos
+protocolos de loss.)
+
+> ⚠️ **Revertido para multifásico (2026-08-09).** El commit `7142191`
+> (2026-08-04, refactor kw-only) había unificado
+> `mix_compressibility → compressibility` en `beggs_brill_gradient` para que
+> el adaptador emitiera una sola clave sin ramificar por modelo. La sesión de
+> diseño del 2026-08-09 cerró la regla contraria: **el `StateModel` entrega
+> propiedades por fase y toda propiedad de mezcla es cómputo de `physics`.**
+> La compresibilidad de mezcla se pondera por holdup, y el holdup lo calcula
+> B&B — el `StateModel` no tiene cómo entregarla.
+>
+> Firma resultante: `compressibility_gas` / `compressibility_liquid`, con la
+> ponderación interna a la correlación. El monofásico conserva el nombre
+> pelado `compressibility`. Ver `CLAUDE.md` #19.
+> **Estado: pendiente de implementación** (próxima sesión de código).
 
 **Testing**: golden tests contra casos de libro/referencia (mismo patrón que
 `multiphase`, ver §3). 11 tests pasando entre los cuatro módulos de physics
@@ -169,6 +178,12 @@ orden en que están definidas en el módulo (flowmap → holdup → detailed →
   `fluids` espera N/m también, así que no queda compensación pendiente.
 - **Vectorización**: no implementada (`_beggs_brill_detailed` es escalar);
   `beggs_brill_flowmap` sí. Ver roadmap v0.5 (broadcasting `pd.Series`).
+- **Firma por fase de `compressibility` — pendiente.** `compressibility_gas`
+  / `compressibility_liquid` en lugar del valor de mezcla, con la ponderación
+  por holdup adentro de la correlación. Decidido 2026-08-09; toca
+  `beggs_brill_gradient`, `_beggs_brill_detailed`,
+  `test_beggs_brill_vs_fluids.py` y `test_beggs_brill_vs_book.py`. Fija la
+  convención de sufijos antes de que entre la segunda correlación en v0.5.
 
 ---
 

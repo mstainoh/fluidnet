@@ -30,6 +30,19 @@ Importante para no sobrevender: esto **no** implica que las redes de flujo sean 
 
 El README debe posicionarse explícitamente contra pandapipes/WNTR: es la primera pregunta de cualquier reviewer.
 
+**Scope formal.** El dominio de problemas es: potencial en nodos (*across*),
+flujo en ejes (*through*), relación constitutiva monótona expresable como
+`Δ = ∫ f(P, x, ...) dx`. Formalmente, un grafo lineal / bond graph con
+elementos disipativos. La garantía de existencia y unicidad tiene dos
+niveles que no hay que confundir: Lipschitz para la ODE del eje, content de
+Millar para el problema de red. Quedan fuera, como límite matemático
+declarado: histéresis, relaciones implícitas no reducibles a ODE, y
+elementos activos (rompen la monotonía).
+
+Este es el enunciado correcto del alcance del proyecto — más preciso y más
+defendible que "redes de fluidos" o "redes acíclicas", y es el que debe ir al
+README.
+
 ---
 
 ## 2. Arquitectura de capas
@@ -80,11 +93,39 @@ Dataclass (frozen) con álgebra:
 - **Rate es un input, no un cálculo.** El `Rate` es el argumento de la correlación (o el output, si estamos haciendo root solving). El fluido es lo que entra en la fórmula de gradiente. Son roles distintos y conviene que sean tipos distintos.
 - **El diferencial de mezcla de salmueras no se pierde.** Lo que se propaga por la red no son *propiedades*, es **composición** — que sí es lineal bajo mezcla ponderada por caudal e invariante bajo scaling. Las propiedades nunca se almacenan: se derivan del `Fluid` en el punto donde se necesitan, con la presión y temperatura locales. Esto también satisface el requisito de que el estado del fluido sea función de `P` y no una constante congelada.
 
-Jerarquía mínima v0.2: `Rate` (protocolo/ABC) → `ScalarRate` (monofásico, cubre agua/salmuera simple; composición trivial). El usuario extiende sin tocar el core: `BrineRate` (composición iónica → saturation indices), `MultiphaseRate` (fracciones), quedan como ejemplos/extensiones, no core.
+**Definición de `Rate` por contrato, no por contenido**: *puede sumarse con
+otros rates y dar balance cero, y puede meterse en una loss function.* Eso es
+todo lo que el core exige. Es la definición que hace que `ComplexRate`
+(fasores, red AC) entre sin tocar el álgebra.
+
+**La composición es atributo de subclase, no de clase.** `ScalarRate` no
+tiene el campo — no lo tiene vacío ni con un singleton `{"fluid": 1.0}`. La
+uniformidad va en el método (la regla de mezcla), no en el dato. Un singleton
+obligaría a iterar un dict y hacer una división ponderada por nodo en el caso
+monofásico, que es justamente el loop interno del optimizer de v0.5, y no
+vectoriza.
+
+`as_physics_kwargs()` **sí es un método de `Rate`**: la magnitud extensiva va
+a la loss function siempre. Lo que no es responsabilidad del `Rate` es
+componerla con la fracción de fase — eso es `loss_func`. Y se arma una vez
+por eje, **fuera del `solve_ivp`**: en steady-state sin intercambio de masa
+el mass rate es constante a lo largo del eje, así que el RHS sólo actualiza
+`pressure`. Sin ese hoisting, con 10²–10³ evaluaciones del RHS por eje, el
+costo del wrapper deja de ser despreciable frente a un float pelado.
+
+**No existe un `MultiphaseRate` con fracciones.** El split líquido/gas depende
+de un flash `(P, T, comp)` y cambia a lo largo del caño: es trabajo de EOS,
+o sea del `StateModel`. Un `StateModel` de fracción impuesta ("asumo 30 % de
+vapor") es válido como hipótesis explícita de modelado, pero es un fluido, no
+un rate.
+
+Jerarquía mínima v0.2: `Rate` (protocolo/ABC) → `ScalarRate`. `BrineRate`
+(composición iónica → saturation indices) queda como ejemplo/extensión, no
+core.
 
 **Decisión heredada de mineplanner a corregir**: `propagate_rates` usa `sum(propagated[p] for p in predecessors)` — `sum()` arranca de `0` (int). `Rate` debe soportar `0 + rate` (`__radd__`) o la propagación usa `functools.reduce`. Detalle chico, pero es exactamente el bug que rompe el polimorfismo.
 
-### 2.1bis Fluid — fábrica de estado, no estado
+### 2.1bis `StateModel` / `Fluid` — fábrica de estado, no estado
 
 `Fluid` es **stateless**: no es un objeto con densidad 1000, es el **modelo** que sabe mapear `(composición, P, T) → propiedades`.
 
@@ -104,6 +145,37 @@ Esto reconcilia dos cosas que parecen chocar: el fluido es un atributo *declarat
 La consecuencia de tenerla desde el día uno es que v2 (perfiles de temperatura prescritos) es **aditivo**: el solver pasa `T` desde un atributo de nodo/edge en vez de `None`, sin cambio de protocolo. Agregar el parámetro después habría roto la firma.
 
 **Dueño del `Fluid`**: atributo de red hasta v1.0, atributo de nodo desde v1.5, con resolución `G.nodes[n].get('fluid', network.fluid)`. El fluido único de red es el caso degenerado del fluido por nodo, no un mecanismo distinto que después se reemplaza. En v1.5 el fluido de cada nodo se precalcula en la misma pasada topológica que ya hace `propagate_rates` — no hay maquinaria nueva. **Un edge toma el fluido de su nodo `upstream`**: la mezcla ocurre *en* el nodo receptor, nunca dentro del caño. En v1 es una identidad, pero la semántica queda escrita desde ahora.
+
+**El protocolo es neutro; `Fluid` es una implementación.** Lo que la capa
+necesita genéricamente es un transformador de la variable *across* del nodo
+(más el estado propagado) en los argumentos de la función de gradiente. En
+fluidos eso es `(comp, T, P) → (ρ, μ, β, σ)`; en una red eléctrica AC es
+`(V) → impedancia`. La forma es la misma.
+
+La cadena es **anidada, `comp → T → P`**, no una tupla plana: fijadas la
+composición y la temperatura, la parcial que queda es sólo función de `P`.
+Eso es lo que hace prolija la formulación de la ODE — una única variable
+independiente en el integrando.
+
+Consecuencia: **`temperature` no asciende al protocolo.** Vive en la firma de
+`Fluid`, donde tiene sentido; en el protocolo genérico lo contamina y puede
+complicar la existencia de la solución.
+
+Que el protocolo se llame `Fluid` sería, además, evidencia en contra del
+diferencial physics-agnostic — la fila más débil de la tabla de
+diferenciales del ROADMAP — justo en la firma que un reviewer va a leer
+primero.
+
+**Propiedades por fase; la mezcla la calcula `physics`.** El `StateModel`
+entrega `density_gas` / `density_liquid` / `compressibility_gas` /
+`compressibility_liquid`; el caso monofásico usa el nombre pelado. La razón
+es dura: la compresibilidad de mezcla se pondera por holdup, y el holdup lo
+calcula la correlación — el `StateModel` no tiene cómo saberlo. Esta línea de
+corte se fija ahora, antes de que entre la segunda correlación en v0.5,
+porque es exactamente donde se rompería.
+
+*(Abierto: la forma concreta del estado bajo esta convención — ya no puede
+ser genéricamente escalar. Ver `ROADMAP §Abiertas`.)*
 
 ### 2.2 loss_func — dos protocolos, no uno
 
@@ -136,6 +208,43 @@ La salida no es que lo declare el usuario al registrar la loss ni que lo chequee
 - El `full_output: bool` de `darcy_dp` actual desaparece de la firma pública (queda como mecanismo interno del decorador).
 
 Built-ins v0.2: `constant_friction` (baseline trivial, para tests y docs) y `darcy_weisbach` (portado de `pressure_functions.py`, que ya está en buen estado: Chen approx, régimen laminar/transición/turbulento, minor losses K, vectorizado numpy). `darcy_weisbach` obtiene las propiedades pidiéndole el `FluidState` al `Fluid`, no leyéndolas del `Rate` ni de la red.
+
+**Contrato de `LossFunc`: dos métodos.** `solve_dp(rate, state,
+**edge_attrs) -> dp` es abstracto; `solve_rate(dp, state, **edge_attrs) ->
+rate` vive en el protocolo integral con `NotImplementedError` por default.
+
+Las dos direcciones `Q→P1→P2` y `Q→P2→P1` **no son modos distintos del
+contrato**: son el signo del `t_span`, ya resuelto por el integrador. Los
+ejes ortogonales reales son el régimen (algebraico/integral, declarado por el
+`StateModel`) y cuál es la incógnita (`dp` o `rate`); el segundo es común a
+ambos regímenes, así que vive en el contrato base y no duplica la matriz.
+
+`solve_rate` se declara aunque no se implemente porque habilita resolver la
+red sobre un **campo de potenciales**. No es el régimen natural de los
+fluidos, pero sí el de otros dominios, y declararlo cuesta una línea.
+`NotImplementedError` en vez de un default por root-find evita imponerle un
+Newton heredado a toda loss que no lo necesite.
+
+**Por qué se mantienen dos protocolos** si el algebraico es formalmente el
+caso degenerado del integral (sin `P` en el integrando, la integral colapsa a
+`grad × L`): porque no tiene sentido formular una ODE cuando la solución
+analítica existe y es simple de poner en código. Es una razón de formulación,
+no de performance — conviene decirlo así, porque "¿por qué dos protocolos?"
+es una pregunta previsible de reviewer.
+
+**Vocabulario canónico en vez de traducción.** Los nombres de los parámetros
+de `physics` son contrato. `loss_func` arma la unión `{**rate_kwargs,
+**state_kwargs, **edge_attrs}` y filtra por `signature(gradient_fn)`; un dict
+de override existe sólo donde un modelo tenga razón genuina para desviarse.
+Una tabla de renombres general sería deuda: crece con cada modelo nuevo y se
+desincroniza en silencio — el kwarg no pasa, entra un default, y el error
+aparece lejos del origen.
+
+Con eso, `loss_func` queda reducida a un `solve_ivp` wrappeando una función
+de `physics`, que es lo que la hace replicable modelo a modelo. **Compone, no
+traduce**: la aridad multifásica es cómputo (`Rate` aporta el extensivo, el
+`StateModel` la fracción de fase, el producto da los rates por fase), no
+renaming.
 
 ### 2.3 Network — plumbing sin física
 
