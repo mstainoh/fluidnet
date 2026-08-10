@@ -3,9 +3,11 @@
 import logging
 
 import numpy as np
+import pytest
 import scipy.constants as SPC
 
-from fluidnet.physics.multiphase import _beggs_brill_detailed
+from fluidnet.physics.multiphase import beggs_brill_gradient
+from fluidnet.physics.multiphase.beggs_brill import _beggs_brill_detailed
 
 logger = logging.getLogger(__name__)
 
@@ -116,3 +118,37 @@ def test_checalc_case_no_payne() -> None:
         calc["liquid_fraction"], calc["liquid_holdup"],
     )
     assert calc["liquid_fraction"] < calc["liquid_holdup"] <= 1
+
+
+def test_supersonic_raises() -> None:
+    """Momentum term singularity (Ek = compressibility * rho_mix * v_mix**2 -> 1),
+    i.e. blocked/Mach-1 flow. Physical limit, not numerical (see ROADMAP §Abiertas
+    and docs/design/physics-single-multiphase.md)."""
+    with pytest.raises(ValueError, match="Supersonic"):
+        beggs_brill_gradient(
+            mass_rate_liquid=0.01,
+            mass_rate_gas=5.0,
+            density_liquid=1000,
+            density_gas=1.2,
+            viscosity_liquid=1e-3,
+            viscosity_gas=1.8e-5,
+            D=0.05,
+            compressibility_gas=1e-3,
+            compressibility_liquid=0.0,
+        )
+
+
+def test_close_to_supersonic_warns() -> None:
+    """Ek in (0.9, 1) is a declared tolerance band, not the hard cutoff."""
+    with pytest.warns(UserWarning, match="close to supersonic"):
+        beggs_brill_gradient(
+            mass_rate_liquid=0.01,
+            mass_rate_gas=0.0275,
+            density_liquid=1000,
+            density_gas=1.2,
+            viscosity_liquid=1e-3,
+            viscosity_gas=1.8e-5,
+            D=0.05,
+            compressibility_gas=1e-3,
+            compressibility_liquid=0.0,
+        )

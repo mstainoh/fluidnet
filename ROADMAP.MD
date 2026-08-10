@@ -487,11 +487,13 @@ circuitos cerrados: hidráulica de edificios, procesos con recirculación.
   equiespaciados). Sub-pregunta: si la selección de variables es por lista de
   nombres o si se entrega el registro completo y filtra el consumidor. Diseño
   de v0.5, no bloquea v0.2.
-- **Guard de Mach / `Ek → 1`.** El término de momentum explícito tiene
-  singularidad en flujo bloqueado. Verificar si `beggs_brill_gradient` ya
-  levanta `ValueError` ahí; si no, agregarlo. Es un límite físico declarable,
-  no una limitación de implementación — va al README junto con los otros
-  límites declarados.
+- **Guard de Mach / `Ek → 1`.** Verificado 2026-08-10: `single_phase_gradient`
+  y `beggs_brill_gradient` ya levantan `ValueError("Supersonic flow
+  encountered")` en `eh >= 1`, con `warnings.warn` en `eh > 0.9` como banda de
+  tolerancia. Agregada cobertura de test para B&B (`test_supersonic_raises`,
+  `test_close_to_supersonic_warns` en `test_beggs_brill_vs_book.py`) —
+  `single_phase` ya la tenía. **Abierto**: documentar el límite en el README
+  junto con los otros límites físicos declarados.
 - Ubicación de `GradientResult`: hoy vive en `single_phase.py` pero es el
   contrato compartido con `multiphase.py`. Candidato a `physics/types.py`.
   Misma pregunta para dónde vive `FluidState`.

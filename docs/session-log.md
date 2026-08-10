@@ -25,6 +25,30 @@
 
 ---
 
+## 2026-08-10 — código: guard de Mach verificado + tests
+
+**Cerrado:**
+
+- **Guard de Mach (`Ek = compressibility * rho_mix * v_mix**2 → 1`).**
+  Verificado: `single_phase_gradient` y `beggs_brill_gradient` ya levantan
+  `ValueError("Supersonic flow encountered")` en `eh >= 1`, con
+  `warnings.warn` en `eh > 0.9` como banda de tolerancia. El guard ya estaba
+  implementado en ambos módulos (idéntico patrón); solo faltaba test de B&B.
+- Agregados `test_supersonic_raises` y `test_close_to_supersonic_warns` en
+  `tests/physics/test_beggs_brill_vs_book.py` (`single_phase` ya tenía
+  `test_supersonic_raises`). Suite completa + mypy en verde.
+
+**Abierto:**
+
+- Documentar el límite físico en el README junto con los otros límites
+  declarados (scope formal del dominio, DAG del solver, etc.).
+
+**Próximo paso:**
+
+- Sin cambios respecto de la entrada de diseño de abajo.
+
+---
+
 ## 2026-08-10 — diseño: canal `@diagnostic`
 
 > Pregunta de la sesión: cerrar el mecanismo de `@diagnostic`, último ítem
@@ -57,8 +81,6 @@
 
 - **Firma de `diagnose()` y declaración de grilla** — qué variables se piden y
   en qué puntos del trayecto. Diseño de v0.5.
-- **Guard de Mach (`ρv²β → 1`)** — verificar si B&B ya levanta `ValueError`;
-  si no, agregarlo. Candidato a Issue.
 - Ítems previos sin cambios: forma de `FluidState` bajo fases, nombre del
   `Protocol` neutro, ubicación de `GradientResult`, Jacobiano sparse,
   anidación de métodos numéricos.
@@ -70,7 +92,6 @@
 
 **Pendiente (higiene):**
 
-- Issue "Guard de Mach en el término de momentum" (milestone v0.5).
 - Issue "B&B — firma por fase de `compressibility`" (milestone v0.2), sigue
   sin crear.
 
