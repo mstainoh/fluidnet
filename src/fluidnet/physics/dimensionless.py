@@ -52,27 +52,38 @@ def froude(v: ArrayLike, D: ArrayLike) -> ArrayLike:
 
 def mach(
         velocity: ArrayLike,
-        pressure: ArrayLike,
         density: ArrayLike,
-        gamma: float = 1.4
+        compressibility: ArrayLike,
         ) -> ArrayLike:
-    """Mach number ``M = v / c`` with ``c = sqrt(gamma * P / rho)``.
+    """Mach number ``M = v / c`` with ``c = 1 / sqrt(rho * beta)``.
 
     Parameters
     ----------
     velocity : ArrayLike
         Flow velocity [m/s].
-    pressure : ArrayLike
-        Absolute pressure [Pa].
     density : ArrayLike
         Density [kg/m3].
-    gamma : float, optional
-        Heat capacity ratio (default 1.4).
+    compressibility : ArrayLike
+        Compressibility ``beta = (1/rho) * (d rho / d P)`` [1/Pa].
 
     Returns
     -------
     ArrayLike
         Mach number (dimensionless).
+
+    Notes
+    -----
+    The speed of sound is obtained from the compressibility, 
+    ``c**2 = 1 / (rho * beta)``, rather than from an ideal-gas
+    expression. No equation of state is assumed here.
+
+    The thermodynamic process is encoded in *which* ``beta`` the caller
+    provides: an isothermal ``beta`` yields the isothermal Mach number, an
+    isentropic one yields the acoustic Mach number. The two differ by a
+    factor of ``sqrt(gamma)``.
+
+    ``M**2 = rho * beta * v**2`` is the kinetic correction term appearing in
+    the denominator of the pressure gradient; ``M = 1`` is where that
+    gradient becomes singular (choked flow).
     """
-    c = np.sqrt(gamma * pressure / density)
-    return velocity / c
+    return velocity * np.sqrt(density * compressibility)
