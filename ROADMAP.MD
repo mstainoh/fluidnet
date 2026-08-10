@@ -510,13 +510,6 @@ circuitos cerrados: hidráulica de edificios, procesos con recirculación.
   Misma pregunta para dónde vive `FluidState`.
 - Port fino del solver 3: revisar `header_network_optimizer.py` y
   `network_observations.py` de mineplanner.
-- **`across` vs. `pressure` como nombre del argumento del potencial.** Único
-  ítem vivo que toca firmas de `physics/` ya implementadas. `across` admite
-  ensanchar a `float | NDArray` sin romper firma pública; `pressure` obliga a
-  un cambio de firma cuando entre la vectorización por escenarios (v0.5) o el
-  acoplamiento térmico (v2). Contra: `pressure` es más legible para el lector
-  de dominio, que es el 100 % del público de v1.0. Decidir **antes** de tocar
-  `physics/`.
 - **Vectorización por escenarios** (`y0` como array de N condiciones iniciales
   independientes → una evaluación vectorizada del `rhs` por paso en vez de N).
   Es la forma exacta del loop interno del fitting de v0.5. **No confundir con

@@ -165,17 +165,37 @@ Rate ──► composición (intensiva)
     losses monótonas sigue siendo un problema convexo con solución única
     (content de Millar). Loops llegan en v2.0. Al escribir docs o README, no
     presentar DAG como una propiedad del dominio.
-18. **`StateModel`: `Protocol` de nombre neutro; `Fluid` lo implementa.**
+18. **`StateModel`: `Protocol` neutro de dos métodos; `Fluid` lo implementa.**
     Transforma la variable *across* del nodo (más el estado propagado) en los
-    argumentos de la función de gradiente. Fluidos: `(comp, T, P) → (ρ, μ, β,
-    σ)`. Eléctrico AC: `(V) → impedancia`.
-    La cadena es **anidada `comp → T → P`**, no una tupla plana: fijadas
-    composición y `T`, la parcial restante es sólo función de `P` — una sola
-    variable independiente en el integrando, que es lo que hace prolija la
-    ODE.
-    Motivo: `Fluid` en la firma del protocolo es evidencia *en contra* del
-    diferencial physics-agnostic, que es la fila más débil de la tabla del
-    ROADMAP. *(Nombre concreto del protocolo: pendiente.)*
+    argumentos del `gradient_fn`. Fluidos: `(comp, T, P) → (ρ, μ, β, σ)`.
+    Eléctrico AC: `(V) → impedancia`.
+    **Nombre cerrado (2026-08-10)**: `StateModel`. Descartados `Medium` (sólo
+    tiene sentido en continuos) y `ConstitutiveModel` (colisiona con
+    `LossFunc`, que *es* la constitutiva).
+
+    ```
+    StateModel.bind(*, composition, **fields) -> BoundState   # 1× por eje
+    BoundState.__call__(*, x, across) -> State                 # 1× por paso
+    ```
+
+    - **La cadena anidada `comp → T → P` es binding time**, no nesting
+      sintáctico: el orden es por frecuencia de cambio. Fijadas composición y
+      campos prescritos, la parcial que queda es sólo función de `across` —
+      que es lo que hace prolija la ODE (una única variable independiente en
+      el integrando).
+    - **`bind` es aplicación parcial, no construcción.** Motivo de ownership,
+      no de performance: la composición sale de `propagate_rates` (runtime), y
+      si entrara por `__init__` el `StateModel` dejaría de poder ser atributo
+      declarativo de red/nodo (#7).
+    - **`x` está en la firma; los campos físicos no.** `x` es domain-neutral y
+      ya vive en el vocabulario del integrador. `temperature` en `__call__`
+      reabriría esta misma decisión; `**fields` en `__call__` muere con `mypy
+      strict` y obliga a `loss_func` a traducir en vez de componer.
+    - **`temperature` NO asciende al `Protocol`**: se liga en `bind`, cuya
+      firma la declara la implementación concreta (`Fluid.bind(composition,
+      temperature=None)`). Consistente con #6.
+    - Costo aceptado: `x` es un argumento inerte en la firma pública hasta v2.
+      Se documenta en el docstring.
 19. **Convención de sufijos de fase. El `StateModel` entrega propiedades por
     fase; toda propiedad de mezcla es cómputo de `physics`.**
     `density_gas` / `density_liquid` / `compressibility_gas` /
@@ -269,6 +289,37 @@ Rate ──► composición (intensiva)
     **Corolario de secuencia: `@diagnostic` ya no bloquea `darcy_weisbach`.**
     Se escribe hoy sin ninguna conciencia de diagnóstico y el mecanismo se
     le suma en v0.5 sin tocarle el cuerpo.
+26. **Dos clases hermanas de `BoundState`, discriminadas en `bind` por
+    `callable(field)`.** El corte no es "campo fijo vs. variable" sino **si el
+    objeto ligado necesita `x`**: `None` y un escalar son el mismo caso (`x` se
+    descarta); un callable es el otro. La rama se decide una vez, fuera del
+    loop. Evita que `None` viaje disfrazado de función por la capa más caliente.
+27. **Los campos prescritos son datos, no cantidades conservadas.** No se impone
+    balance sobre ellos en los nodos. La consistencia de un perfil de `T` entre
+    ramas que mezclan es hipótesis explícita del usuario. Va declarado en README.
+28. **Regla de ligado**: *todo lo que no depende de `x` se liga antes del
+    integrador; lo que depende de `x` entra por el `bound`.* Unifica #18, el
+    hoisting de `rate.as_physics_kwargs()` (#21) y #26.
+29. **Vocabulario: `gradient_fn` ≠ `loss_func`.** `gradient_fn` es la función
+    pura de `physics/` (kwargs planos en SI → derivada, directionally blind).
+    `loss_func` es la capa (`AlgebraicLoss`/`IntegralLoss`) que compone
+    `rate` + `bound` + `edge_attrs`, arma el `rhs` e integra. No usar
+    `loss_func` para referirse al gradiente: vuelve ilegible el rationale de #18.
+    Corolario: `as_physics_kwargs()` es **un contrato con varios dueños**
+    (`Rate`, `State`, y en v1.5 los atributos de eje calculados), no un método
+    repetido por casualidad.
+30. **`across` en el `Protocol`, `pressure` de la implementación concreta para
+    abajo.** El `Protocol` es neutro por diseño (#18): `pressure` ahí es la
+    misma evidencia en contra del diferencial physics-agnostic que motivó el
+    nombre neutro. Hacia abajo, `pressure` ya está en `physics/`, es el
+    vocabulario del dominio, y renombrarlo tocaría capa cero testeada.
+    Traducción en el `__call__` del `BoundState`, una línea. Consecuencia
+    buscada: cuando entre la vectorización por escenarios, `across: float |
+    ArrayLike` cambia sólo en el `Protocol`.
+    Firmas: `StateModel.bind(*, composition, **fields) -> BoundState`;
+    `BoundState.__call__(*, x: float, across: float) -> State`;
+    `Fluid.bind(*, composition, temperature=None)`;
+    `Fluid.get_state(*, composition, temperature, pressure)`.
 
 ## Convenciones de testing (capa physics)
 
