@@ -41,6 +41,25 @@ protocolos de loss.)
 > pelado `compressibility`. Ver `CLAUDE.md` #19.
 > **Estado: pendiente de implementación** (próxima sesión de código).
 
+**El término de momentum es explícito, no un residuo.** Sale de
+`d(ρv²) = d((1/ρ)·(ρv)²)`, donde `ρv` es constante por conservación de masa,
+de modo que el diferencial recae íntegro sobre `d(1/ρ)`, que es función de la
+compresibilidad y de `dP`. La forma cerrada
+`dP/dx = (grav + fric)/(1 − ρv²β)` es el resultado de despejar `dP` de esa
+identidad, no una decisión de diseño ni una aproximación.
+
+Dos consecuencias que conviene tener escritas:
+
+- `total = gravity + friction + momentum` es una **identidad algebraica
+  verificable**, no una definición de conveniencia. Test barato y que vale la
+  pena: comparar `result.total` contra la forma cerrada a tolerancia de punto
+  flotante.
+- Con `β = 0` el término da **cero exacto**, no despreciable. Coherente con
+  que `β = 0` sea el valor físico del líquido incompresible y no un flag.
+- Hay singularidad genuina en `ρv²β → 1` (flujo bloqueado, Mach unitario). Es
+  un límite físico, no numérico. Ver `ROADMAP §Abiertas` (guard pendiente de
+  verificar).
+
 **Testing**: golden tests contra casos de libro/referencia (mismo patrón que
 `multiphase`, ver §3). 11 tests pasando entre los cuatro módulos de physics
 (`dimensionless`, `friction`, `single_phase`, `multiphase`) al momento de
@@ -70,12 +89,22 @@ conocen la orientación del edge; la dirección de flujo no es una feature de
 `loss_func` es quien adapta el signo antes de llamar a `physics`, no al
 revés.
 
-**API interna**: `_beggs_brill_detailed(*, ...) -> dict` — mismo cálculo
-más intermedios (`NFr`, `Cl`, `liquid_holdup`, `ReNs`, `f`, `fNs`,
-`mixture_density`, `flow_regime`). Misma firma kw-only que la pública. Es
-lo que consumen los tests y, eventualmente, el canal `@diagnostic`. No es
-parte del contrato público — ningún solver debería importar
-`_beggs_brill_detailed` directamente.
+**API interna**: `_beggs_brill_detailed(*, ...) -> dict` — mismo cálculo más
+intermedios (`NFr`, `Cl`, `liquid_holdup`, `ReNs`, `f`, `fNs`,
+`mixture_density`, `flow_regime`). Misma firma kw-only que la pública. Es lo
+que consumen los tests y el canal `@diagnostic` de nivel 1.
+
+**Cómo llega al canal de diagnóstico** (decisión 2026-08-10, `CLAUDE.md` #25):
+ningún solver la importa, y tampoco se la descubre por convención de nombre.
+Se pasa **explícitamente** como `detailed_fn` al construir la `loss_func`, que
+la invoca en post-proceso sobre el `P(x)` ya convergido. Sin `detailed_fn` la
+loss entrega igual el nivel 0 (la descomposición de `GradientResult`).
+
+El costo del patrón wrapper-sobre-detailed está medido: ~19% sobre el tiempo
+de la correlación en el peor caso (escalar, correlación barata), diluido a
+irrelevancia al vectorizar en v0.5 — se construye un dict por llamada de
+array, no uno por elemento. No se justifica una firma polimórfica
+(`-> GradientResult | dict`) para recuperarlo.
 
 **Contrato de forma (hoy)**: **escalar únicamente**. `int(flowmap(...))`
 fuerza escalar en `_beggs_brill_detailed`, igual que los `if` de `_holdup` y

@@ -330,13 +330,35 @@ Justificación: el solver 1 con Result completo es el mínimo que valida las cap
 6. **El régimen `AlgebraicLoss`/`IntegralLoss` lo declara el `Fluid`** (§2.2) — cierra la decisión que este documento listaba como abierta.
 7. **Fluido de red hasta v1.0 → de nodo en v1.5, mismo mecanismo**; el edge toma el fluido del nodo `upstream` (§2.1bis).
 
+**Cerradas (10/08/2026 — sesión de diseño `@diagnostic`):**
+
+11. **El canal de diagnósticos es post-proceso, no intercepción.** Cierra el
+    ítem 8 de "Abiertas". La disyuntiva contextvar vs. colector presuponía que
+    el diagnóstico se capturaba *durante* el solve; una vez que se replayea
+    sobre la solución convergida, no hay nada que capturar en vuelo y la
+    disyuntiva desaparece. Motivo de fondo: el gradiente es puntual y el
+    diagnóstico es de eje; la asimetría no la resuelve el contenedor de
+    retorno, la resuelve mover la evaluación después de la integración, donde
+    la coordenada del eje ya está determinada.
+12. **`GradientResult` inmutable en forma y en contrato** — `NamedTuple`, tres
+    componentes, `total` como property. Rechazadas explícitamente: campo
+    `extra: dict[str, Any]` (introduce `Any` en capa cero y repite el patrón
+    que #11 de `CLAUDE.md` prohíbe una capa más arriba) y `__array__` →
+    `total` (coerción lossy silenciosa de una descomposición).
+13. **Diagnóstico en dos niveles; el nivel 1 se declara, no se descubre.** La
+    descomposición es nivel 0 y universal. Los intermedios de correlación son
+    nivel 1 y opcionales, pasados como `detailed_fn` explícita al construir la
+    loss. Descubrir el hermano por convención de nombre (`_*_detailed`) se
+    descartó: no es greppeable desde el consumidor y no funciona para
+    correlaciones de terceros, que es justamente el caso que sostiene el
+    diferencial physics-agnostic.
+
 **Abiertas (no bloquean la arquitectura):**
 
-8. **Mecanismo del canal de diagnósticos** (contextvar vs. objeto colector pasado por el solver) — a resolver en diseño detallado del decorador `@diagnostic`.
 9. **MVP de 26 tests**: declarado perdido y superado (ver `ROADMAP.md`). Este draft es la spec de reconstrucción.
 10. **Diseño del solver 3**: falta revisar `header_network_optimizer.py` y `network_observations.py` de mineplanner para afinar el port de `EdgeParameter`/observaciones (fuera de scope v0.2, no urge).
 
-> Nota de higiene documental: `README_CLAUDE.md` establece que los ADR no llevan sección "Abiertas" (el backlog de diseño vive en `ROADMAP.md`). Esta sección se mantiene por continuidad histórica, pero las entradas 8–10 están duplicadas en `ROADMAP.md § Decisiones abiertas`, que es la fuente de verdad. Candidata a limpiarse en una pasada futura.
+> Nota de higiene documental: `README_CLAUDE.md` establece que los ADR no llevan sección "Abiertas" (el backlog de diseño vive en `ROADMAP.md`). Esta sección se mantiene por continuidad histórica, pero las entradas 9–10 están duplicadas en `ROADMAP.md § Decisiones abiertas`, que es la fuente de verdad. Candidata a limpiarse en una pasada futura.
 
 ---
 

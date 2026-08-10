@@ -254,8 +254,10 @@ usar. Es el punto de submit a JOSS y **el diferencial del proyecto**.
   pinnear valores reales. **Nota de secuencia**: B&B no es invocable por ningún
   solver hasta `IntegralLoss` (v1.0); se vectoriza acá porque impacta el
   optimizer y porque `physics/` se valida sola (ver corolario en Capa 0).
-- Decorador `@diagnostic` resuelto → `Result` con `f`, `Re`, `v` por edge
-  cuando el solver corre con `full_output=True`.
+- `@diagnostic` implementado como post-proceso: `diagnose()` en el protocolo
+  de loss + `detailed_fn` opcional por correlación → `Result` con holdup,
+  régimen, `f`, `Re`, `v` a lo largo del eje cuando el solver corre con
+  `full_output=True`. Mecanismo cerrado en 2026-08-10; falta sólo la firma.
 - **Fin del freeze de correlaciones**: modelos de holdup no-slip (`Hl = Cl`) y
   constant-slip, como baseline y puente pedagógico hacia B&B. *Diferidos desde
   `physics-single-multiphase.md` §5.*
@@ -359,8 +361,8 @@ circuitos cerrados: hidráulica de edificios, procesos con recirculación.
    `Rate`/`Fluid` contra un uso real. Sin código.
 3. **Firmas públicas restantes** — los dos `Protocol` de loss y `Result`, a
    nivel de interfaz (docstrings + type hints), no implementación.
-4. **Mecanismo de `@diagnostic`** (contextvar vs. colector) — bloquea
-   `darcy_weisbach`.
+4. ~~Mecanismo de `@diagnostic`~~ — **cerrado (2026-08-10), ya no bloquea.**
+   `darcy_weisbach` se implementa sin él.
 5. **Implementar** por piezas chicas siguiendo el mapa de rescate del ADR §3,
    commiteando de a poco contra `main` limpia.
 
@@ -440,6 +442,14 @@ circuitos cerrados: hidráulica de edificios, procesos con recirculación.
 - **`as_physics_kwargs()` vive en `Rate`** (lo extensivo siempre va a la
   loss); se arma una vez por eje, fuera del `solve_ivp`. ← cierra el ítem
   abierto desde 2026-08-07. *(2026-08-09)*
+- **Canal `@diagnostic`: post-proceso sobre la solución convergida, en la capa
+  `loss_func`.** Ni contextvar ni colector durante el solve — la pregunta
+  estaba mal planteada. Se replayea `detailed` sobre el `P(x)` ya integrado,
+  en una grilla declarada. `physics/` no se toca; `GradientResult` queda como
+  `NamedTuple` sin `extra` ni `__array__`. Dos niveles: la descomposición
+  (siempre) y los intermedios de correlación (`detailed_fn` opcional,
+  declarada explícita, nunca por convención de nombre). **Deja de bloquear
+  `darcy_weisbach`** — v0.2 avanza sin él. *(2026-08-10)*
 
 ### Abiertas
 
@@ -471,8 +481,17 @@ circuitos cerrados: hidráulica de edificios, procesos con recirculación.
   hace el lazo barato: no hay caché que invalidar entre iteraciones.
   **Abierto**: criterio de corte; y si en v2.0 la inversión de sentido de flujo
   en loops requiere regularización o basta con detectarla y abortar.
-- Mecanismo del canal de `@diagnostic` (contextvar vs. objeto colector) —
-  bloquea `darcy_weisbach`.
+- **Firma concreta de `diagnose()` y de la declaración de grilla.** Cerrado el
+  mecanismo, falta la interfaz: cómo el usuario dice *qué* quiere ver (holdup,
+  velocidad, régimen) y *dónde* (extremos, todos los `sol.t`, k puntos
+  equiespaciados). Sub-pregunta: si la selección de variables es por lista de
+  nombres o si se entrega el registro completo y filtra el consumidor. Diseño
+  de v0.5, no bloquea v0.2.
+- **Guard de Mach / `Ek → 1`.** El término de momentum explícito tiene
+  singularidad en flujo bloqueado. Verificar si `beggs_brill_gradient` ya
+  levanta `ValueError` ahí; si no, agregarlo. Es un límite físico declarable,
+  no una limitación de implementación — va al README junto con los otros
+  límites declarados.
 - Ubicación de `GradientResult`: hoy vive en `single_phase.py` pero es el
   contrato compartido con `multiphase.py`. Candidato a `physics/types.py`.
   Misma pregunta para dónde vive `FluidState`.

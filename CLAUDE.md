@@ -225,6 +225,44 @@ Rate ──► composición (intensiva)
     `Network`, capa de I/O. Si `loss_func` convierte, la decisión #1 (SI
     estricto) se vuelve nominal, y es de las que un reviewer chequea leyendo
     una firma.
+24. **El canal `@diagnostic` es post-proceso, no interceptor.** El
+    diagnóstico se evalúa sobre la solución **ya convergida** (el `P(x)` que
+    devolvió el integrador), no durante el solve. Consecuencias:
+    - Los pasos rechazados de `solve_ivp` quedan fuera por construcción,
+      no por filtrado.
+    - La grilla de evaluación es **declarada** (extremos, `sol.t`, o k
+      puntos), nunca la que eligió el integrador. No hay que reducir N
+      evaluaciones arbitrarias a un valor de eje: el problema se disuelve.
+    - Overhead exacto cero durante el fitting: los iterados intermedios del
+      optimizer nunca piden diagnóstico.
+    - El caso algebraico es el degenerado (grilla de un punto), mismo
+      mecanismo, sin rama especial — igual que `AlgebraicLoss` respecto de
+      `IntegralLoss`.
+    Vive en `loss_func`. **`physics/` no se toca**: sigue siendo evaluador
+    puntual y directionally blind.
+25. **Dos niveles de diagnóstico. `GradientResult` es el nivel 0.**
+    La descomposición `(gravity, friction, momentum)` es información
+    diagnóstica real, existe siempre y es gratis — toda función de gradiente
+    la provee. El nivel 1 (intermedios de correlación: holdup, régimen, `f`,
+    `Re`) es **opt-in** vía una función `detailed` hermana.
+    - `GradientResult` **se queda como `NamedTuple`**. Sin campo
+      `extra: dict[str, Any]` (violaría #11 una capa más abajo y rompe
+      `--strict`), sin `__array__` (colapsaría la descomposición en silencio;
+      la coerción a escalar se escribe `.total`).
+    - **Sin polimorfismo por flag.** Nada de `-> GradientResult | dict`.
+      Una implementación `_detailed`, un wrapper público que extrae. Overhead
+      medido del dict: ~19% en el peor caso (escalar, correlación barata), y
+      se divide por N al vectorizar en v0.5 — un dict por llamada de array,
+      no por elemento.
+    - **El par se declara explícito**, no por convención de nombre: la loss
+      recibe `detailed_fn` (default `None`), no introspecciona `_*_detailed`.
+      Una correlación de terceros no está obligada a exponer intermedios;
+      sin `detailed_fn` se entrega el nivel 0.
+    - `diagnose` es el tercer método del protocolo `LossFunc`, con el mismo
+      tratamiento que `solve_rate`: `NotImplementedError` por default.
+    **Corolario de secuencia: `@diagnostic` ya no bloquea `darcy_weisbach`.**
+    Se escribe hoy sin ninguna conciencia de diagnóstico y el mecanismo se
+    le suma en v0.5 sin tocarle el cuerpo.
 
 ## Convenciones de testing (capa physics)
 
@@ -299,7 +337,10 @@ aplicá directo:
 - Campos de `GradientResult` y de `FluidState`: pasar `float` → `ArrayLike`
   cambia el contrato de retorno de toda la capa cero. Decisión de diseño
   abierta.
-
+- `GradientResult`: no lo conviertas a `dataclass`, no le agregues campos, no
+  le agregues `__array__`. Es contrato de capa cero (decisión #25). Si un
+  error de mypy parece pedir eso, pará y preguntá.
+  
 ## Entorno (resuelto, no re-investigar)
 
 - Paquete tipado PEP 561: `py.typed` en `src/fluidnet/`, empaquetado vía

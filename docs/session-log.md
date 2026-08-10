@@ -25,6 +25,57 @@
 
 ---
 
+## 2026-08-10 — diseño: canal `@diagnostic`
+
+> Pregunta de la sesión: cerrar el mecanismo de `@diagnostic`, último ítem
+> listado como bloqueante de `darcy_weisbach`.
+
+**Cerrado:**
+
+- **`@diagnostic` es post-proceso sobre la solución convergida.** La
+  disyuntiva histórica (contextvar vs. colector) estaba mal planteada:
+  presuponía captura en vuelo. Replayeando `detailed` sobre el `P(x)` ya
+  integrado, en grilla declarada, desaparecen los pasos rechazados de
+  `solve_ivp`, desaparece la ambigüedad de reducción punto→eje, y el costo
+  durante el fitting es cero exacto. Idea de Marcelo.
+- **`GradientResult` no cambia**: sigue `NamedTuple`. Rechazados `extra:
+  dict[str, Any]` y `__array__ → total`.
+- **Dos niveles**: descomposición (nivel 0, universal, gratis) e intermedios
+  de correlación (nivel 1, `detailed_fn` opcional y **explícita**, nunca por
+  convención de nombre — no funciona para correlaciones de terceros).
+- **`diagnose()` como tercer método del protocolo `LossFunc`**, con el patrón
+  ya cerrado de `solve_rate` (`NotImplementedError` por default).
+- **Overhead medido**: dict de 8 claves ≈187 ns, llamada extra ≈96 ns,
+  correlación escalar proxy ≈1515 ns → ~19% peor caso. Se divide por N al
+  vectorizar. No justifica firma polimórfica.
+- **`@diagnostic` deja de bloquear `darcy_weisbach` y v0.2.**
+- **Momentum explícito, derivación escrita** (`d(ρv²)` con `ρv` constante →
+  todo el diferencial sobre `d(1/ρ)`). `total` como suma pasa a ser identidad
+  verificable; `β = 0` da cero exacto.
+
+**Abierto:**
+
+- **Firma de `diagnose()` y declaración de grilla** — qué variables se piden y
+  en qué puntos del trayecto. Diseño de v0.5.
+- **Guard de Mach (`ρv²β → 1`)** — verificar si B&B ya levanta `ValueError`;
+  si no, agregarlo. Candidato a Issue.
+- Ítems previos sin cambios: forma de `FluidState` bajo fases, nombre del
+  `Protocol` neutro, ubicación de `GradientResult`, Jacobiano sparse,
+  anidación de métodos numéricos.
+
+**Próximo paso:**
+
+- Sin cambios: sesión de código con la firma por fase de `compressibility` en
+  B&B; después, forma de `FluidState` y nombre del `Protocol`.
+
+**Pendiente (higiene):**
+
+- Issue "Guard de Mach en el término de momentum" (milestone v0.5).
+- Issue "B&B — firma por fase de `compressibility`" (milestone v0.2), sigue
+  sin crear.
+
+---
+
 ## 2026-08-09 — código: firma de B&B por fase
 
 > Continuación directa del "Próximo paso" de la sesión de diseño del mismo
