@@ -77,15 +77,21 @@ Rate ──► composición (intensiva)
    - **Recibe la composición como dato crudo** (mapping / array), **nunca un
      objeto `Rate`**. Si recibiera el `Rate` dejaría de ser capa cero.
    - `physics/` nunca ve `T` ni composición: recibe propiedades ya evaluadas.
-5. **`FluidState` con todos los campos requeridos, nunca `float | None`.**
-   `β = 0` es el valor físico exacto del agua, no una ausencia. Un
-   `sigma=None` filtrándose a B&B es el mismo problema que un default físico
-   invisible, y rompe el filtrado de kwargs por `signature`.
-   ⚠️ **La forma concreta está reabierta** (sesión 2026-08-09): bajo la
-   convención de sufijos de fase (#19) el estado no puede ser genéricamente
-   escalar. Dirección propuesta, **no cerrada**: subclases
-   `SinglePhaseState` (escalar) / `MultiPhaseState` (vectorial + dict de
-   nombres `_liquid`/`_gas`). No implementar hasta que cierre.
+5. **`FluidState`: `NamedTuple` de campos requeridos, nunca `float | None`,
+   construido por llamada.** `β = 0` es el valor físico exacto del agua, no
+   una ausencia. Un `sigma=None` filtrándose a B&B es el mismo problema que
+   un default físico invisible, y rompe el filtrado de kwargs por
+   `signature`.
+   **Forma cerrada (2026-08-10)**: subclases `SinglePhaseState` (nombres
+   pelados) y `MultiPhaseState` (sufijos de fase, #19), con
+   `as_physics_kwargs()` **del lado del estado**.
+   Rationale de por qué el parseo es del estado y no de `loss_func`: el
+   número de fases es propiedad de la **implementación del `StateModel`**,
+   no del valor — un flash puede cruzar el punto de burbuja a lo largo de
+   `x`, pero un modelo multifásico igual emite ambas fases (una con fracción
+   cero). La clase del estado es fija por modelo, así que el parseo es
+   estático.
+   Se construye una vez por evaluación del gradiente: tiene que ser barato.
 6. **`temperature` en la firma desde v0.2, default `None` = "no
    suministrado", nunca un valor implícito.** Todo fluido es en general
    función de `(P, T)`; se deja opcional para los casos en que `T` es

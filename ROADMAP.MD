@@ -162,8 +162,11 @@ Hermana de `physics/`, mismo contrato de capa cero: función pura, SI, sin
 conocer nada de arriba. **Fábrica stateless de `FluidState`.**
 
 ```
-Fluid.get_state(*, pressure, temperature=None, composition=...) -> FluidState
-FluidState = NamedTuple(density, viscosity, compressibility, sigma)
+StateModel.bind(*, composition, **fields) -> BoundState   # 1× por eje
+BoundState.__call__(*, x, across) -> State                # 1× por evaluación
+
+Fluid.bind(*, composition, temperature=None) -> BoundState
+FluidState: SinglePhaseState | MultiPhaseState  (NamedTuple + as_physics_kwargs)
 ```
 
 - Lo que vive en la red/nodo no es *un fluido con densidad 1000*, es el
@@ -352,10 +355,10 @@ circuitos cerrados: hidráulica de edificios, procesos con recirculación.
 
 ## Secuencia inmediata (dentro de v0.2, en orden)
 
-1. **Cerrar la forma concreta de `Rate`/`ScalarRate` y `Fluid`/`FluidState`** —
-   el split extensivo/intensivo ya está cerrado (2026-08-07); falta la forma
-   exacta de la composición trivial de `ScalarRate` y el adaptador
-   `as_physics_kwargs()`.
+1. ~~Cerrar la forma concreta de `Rate`/`ScalarRate` y `Fluid`/`FluidState`~~ —
+   **cerrado (2026-08-10)**. Composición trivial, `as_physics_kwargs()`,
+   `StateModel`/`BoundState` y forma de `FluidState`: todo con spec.
+   **Siguiente: sesión de código.**
 2. **Diseño del caso demo** — red sintética de wellfield: inputs, outputs, qué
    muestra el notebook. Define los tests de aceptación y tensiona las firmas de
    `Rate`/`Fluid` contra un uso real. Sin código.
@@ -450,6 +453,14 @@ circuitos cerrados: hidráulica de edificios, procesos con recirculación.
   (siempre) y los intermedios de correlación (`detailed_fn` opcional,
   declarada explícita, nunca por convención de nombre). **Deja de bloquear
   `darcy_weisbach`** — v0.2 avanza sin él. *(2026-08-10)*
+- **`StateModel`: nombre cerrado y protocolo de dos métodos** (`bind` por eje +
+  `__call__(x, across)` por evaluación). `x` asciende al protocolo, los campos
+  físicos no. *(2026-08-10)*
+- **Forma de `FluidState`**: `NamedTuple` por llamada, subclases mono/multi,
+  `as_physics_kwargs()` del lado del estado — el número de fases es propiedad
+  de la implementación, no del valor. *(2026-08-10)*
+- **Campos prescritos = datos, no conservados**: sin balance en nodos.
+  *(2026-08-10)*
 
 ### Abiertas
 
@@ -499,15 +510,21 @@ circuitos cerrados: hidráulica de edificios, procesos con recirculación.
   Misma pregunta para dónde vive `FluidState`.
 - Port fino del solver 3: revisar `header_network_optimizer.py` y
   `network_observations.py` de mineplanner.
-- **Forma de `FluidState` bajo la convención de fases.** Consecuencia directa
-  de la decisión de sufijos: el estado no puede ser genéricamente escalar.
-  Dirección propuesta, **no cerrada**: subclases `SinglePhaseState` (escalar)
-  y `MultiPhaseState` (vectorial + dict de nombres `_liquid`/`_gas`), con el
-  parseo a kwargs del lado del estado. Sub-pregunta: si ese parseo es método
-  del estado o de `loss_func` — "`loss_func` compone" empuja a lo segundo,
-  pero quién sabe cuántas fases hay es el estado. Toca `CLAUDE.md` #5.
-- **Nombre concreto del `Protocol` neutro** (`StateModel` / `Medium` /
-  `ConstitutiveModel`) — fijar antes de que aparezca en firmas públicas.
+- **`across` vs. `pressure` como nombre del argumento del potencial.** Único
+  ítem vivo que toca firmas de `physics/` ya implementadas. `across` admite
+  ensanchar a `float | NDArray` sin romper firma pública; `pressure` obliga a
+  un cambio de firma cuando entre la vectorización por escenarios (v0.5) o el
+  acoplamiento térmico (v2). Contra: `pressure` es más legible para el lector
+  de dominio, que es el 100 % del público de v1.0. Decidir **antes** de tocar
+  `physics/`.
+- **Vectorización por escenarios** (`y0` como array de N condiciones iniciales
+  independientes → una evaluación vectorizada del `rhs` por paso en vez de N).
+  Es la forma exacta del loop interno del fitting de v0.5. **No confundir con
+  vectorizar la integración en `x`, que es imposible** (el paso `n+1` depende
+  del `n`). Bloqueante: `_beggs_brill_detailed` es escalar-only — esto sube la
+  prioridad de ese `xfail`, que no era sólo deuda de multifásico.
+  Requisito derivado sobre las implementaciones de `StateModel`: `get_state`
+  tiene que ser array-safe. Se documenta, no se tipa.
 - **Jacobiano sparse estructural en `mass_balance`.** Es la matriz de
   incidencia, conocida de antemano; pasársela a `scipy.optimize.root` es O(1)
   bloque vs. O(E) evaluaciones por iteración de la estimación por diferencias

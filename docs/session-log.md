@@ -25,6 +25,93 @@
 
 ---
 
+## 2026-08-10 — diseño: `StateModel` ligado por eje
+
+**Cerrado:**
+
+- **Nombre del `Protocol`: `StateModel`.** — cierra el ítem abierto del
+  2026-08-09. Descartados `Medium` (sólo tiene sentido en continuos) y
+  `ConstitutiveModel` (colisiona con `LossFunc`, que *es* la constitutiva —
+  usar ese nombre acá vuelve ilegible el argumento de por qué son dos capas).
+- **El `StateModel` tiene dos métodos, en dos tiempos distintos.**
+  `bind(*, composition, **fields) -> BoundState`, una vez por eje; y
+  `BoundState.__call__(*, x, across) -> State`, una vez por evaluación del
+  gradiente. La "cadena anidada `comp → T → P`" cerrada el 2026-08-09 se
+  concreta como **binding time**, no como nesting sintáctico: el orden es por
+  frecuencia de cambio (composición constante en el eje → campos prescritos
+  ligados por eje → `across` variable en cada paso).
+- **`x` asciende al protocolo; los campos físicos no.** La coordenada del eje
+  es domain-neutral: existe en todo dominio, ya está en el vocabulario del
+  integrador (`t_span`), y no dice nada sobre qué física corre adentro. Es el
+  único argumento que se puede agregar sin comprometer el diferencial
+  physics-agnostic. Las dos alternativas se descartan por motivo explícito:
+  `temperature` en la firma reabre la decisión #18; `**fields` en `__call__`
+  muere con `mypy strict` y obliga a `loss_func` a saber qué campos existen en
+  el dominio, contradiciendo "`loss_func` compone, no traduce".
+- **`bind` es aplicación parcial, no construcción — por ownership, no por
+  performance.** Si la composición entrara por `Fluid.__init__`, el `Fluid`
+  dejaría de poder ser atributo declarativo de la red: la composición sale de
+  `propagate_rates`, o sea de runtime. Con `bind` hay **un** `StateModel`
+  declarativo por red/nodo y **un objeto liviano ligado por eje**.
+- **Dos clases hermanas de `BoundState`, discriminadas por `callable(field)`
+  en `bind`.** El corte no es "campo fijo vs. campo variable" sino **si el
+  objeto ligado necesita `x`**: `None` y un escalar son el mismo caso (se
+  guarda el valor, `x` se descarta); un callable es el otro. La rama se decide
+  una vez, en `bind`. Motivo: evita que `None` viaje disfrazado de función a
+  través de la capa más caliente del código. El ahorro de la llamada de Python
+  es marginal en v0.2 (con `β = 0` corre `AlgebraicLoss`: **una** evaluación
+  por eje, no 10²–10³).
+- **Los campos prescritos son datos, no cantidades conservadas.** No se impone
+  balance sobre ellos en los nodos. Si dos corrientes a distinta `T` se
+  mezclan, reconciliar el perfil es hipótesis del usuario. Va declarado en
+  README y ADR: un límite escrito se lee como criterio de modelado;
+  descubierto por un reviewer, se lee como bug.
+- **Forma de `FluidState`: `NamedTuple`, construido por llamada, con
+  `as_physics_kwargs()` propio.** — cierra el ítem abierto del 2026-08-09.
+  Lo que destraba la sub-pregunta es que **el número de fases es propiedad de
+  la implementación del `StateModel`, no del valor**: un flash puede cruzar el
+  punto de burbuja a lo largo de `x`, pero un modelo multifásico igual emite
+  las dos fases (una con fracción cero). La *clase* del estado es fija por
+  modelo, así que el parseo a kwargs es estático y correcto del lado del
+  estado, sin contradecir "`loss_func` compone": `loss_func` sigue componiendo
+  el extensivo con la fracción de fase; el estado sólo se autodescribe.
+  Se mantiene la subdivisión `SinglePhaseState` / `MultiPhaseState`.
+- **Regla que ordena tres decisiones sueltas en una sola**: *todo lo que no
+  depende de `x` se liga antes del integrador; lo que depende de `x` entra por
+  el `bound`.* Es el mismo criterio detrás de `bind`, del hoisting de
+  `rate.as_physics_kwargs()` y de las dos clases hermanas.
+- **Vocabulario: `gradient_fn` (función de `physics/`) vs. `loss_func` (la
+  capa).** Ya está implícito en el filtrado por `signature(gradient_fn)`; se
+  fija como convención de documentación porque el uso informal de `loss_func`
+  para referirse al gradiente vuelve ilegible el rationale de #18.
+- **`as_physics_kwargs()` es un contrato con varios dueños, no un método
+  repetido.** Nombre canónico + valor en SI. Hoy lo implementan `Rate` y
+  `State`; en v1.5 se suma un tercer productor (atributos de eje calculados).
+  El `rhs` es literalmente el merge de esos dicts filtrado por `signature`.
+
+**Corregido en el entendimiento, no en el diseño:**
+
+- El objeto ligado **no se enchufa al integrador**. Lo que entra a `solve_ivp`
+  es el `rhs`, que devuelve `dp/dx`. El `bound` se llama *adentro* del `rhs` y
+  devuelve un `State`. `gradient_fn` es hermano del `bound`, no su consumidor.
+- **La integración en `x` no es vectorizable** y no lo va a ser: el paso `n+1`
+  depende del `n`. El eje vectorizable es el de **escenarios** (`y0` como
+  array de N presiones iniciales independientes → una evaluación vectorizada
+  del `rhs` por paso en vez de N). Es la forma exacta del loop interno del
+  fitting de v0.5.
+
+**Abierto:**
+
+- **`across` vs. `pressure` como nombre del argumento del potencial.** Único
+  ítem que toca firmas de `physics/` ya implementadas. La vectorización por
+  escenarios lo vuelve más urgente de lo que parecía: ya no es una hipótesis
+  de v2 acoplado, está en el camino directo a v0.5.
+
+**Próximo paso**: sesión de código — implementar `StateModel`, `BoundState`,
+`Fluid`, `FluidState`. Spec cerrada, alcance mecánico.
+
+---
+
 ## 2026-08-10 — código: guard de Mach verificado + tests
 
 **Cerrado:**
