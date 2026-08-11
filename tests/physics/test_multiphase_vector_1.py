@@ -4,7 +4,7 @@ Tests the module's functions **in the order they are defined** (flowmap ->
 holdup -> detailed -> public gradient), pinning what is vectorized today and
 spec'ing what v0.5 should add. See `docs/design/physics-single-multiphase.md`
 §3.3 and the roadmap item "Vectorización de `_beggs_brill_detailed`"
-(ROADMAP.MD). `xfail(strict=True)` marks are executable spec, not skips: the
+(ROADMAP.md). `xfail(strict=True)` marks are executable spec, not skips: the
 day broadcasting lands, these tests turn green and `strict=True` forces the
 marker to be removed.
 """
