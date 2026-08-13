@@ -491,6 +491,25 @@ circuitos cerrados: hidráulica de edificios, procesos con recirculación.
   para calzar con la entrada de `physics/`. No reabre la decisión abierta
   sobre los campos almacenados de `FluidState`/`GradientResult`. Ver
   `CLAUDE.md` #18/#30 y ADR §2.1bis.
+- **Campos de `FluidState`: `float` → `ArrayLike` (2026-08-13).** Cierra la
+  decisión que la entrada anterior dejaba abierta. `SinglePhaseFluidState`
+  (`density`/`viscosity`/`compressibility`) pasa a `ArrayLike`, igual que
+  `GradientResult` — que resultó **nunca haber sido `float`**: es
+  `ArrayLike` desde su creación (`physics/types.py`, commit `9780d43`), sin
+  ningún cambio de código necesario ahí. Lo único que hizo falta corregir
+  fue la documentación (`CLAUDE.md` "Tipado" y este mismo archivo), que
+  describía a `GradientResult` como si todavía fuera `float`/pendiente —
+  un desfasaje doc↔código preexistente a esta sesión, no introducido por
+  ella. De paso, la ubicación de `GradientResult` ("hoy vive en
+  `single_phase.py`") también estaba stale: vive en `physics/types.py`
+  desde el mismo commit `9780d43`; `SinglePhaseFluidState` vive en
+  `state/fluids/single_phase_fluids.py`. Ambas preguntas de ubicación de
+  la entrada "Abiertas" quedan resueltas. `IncompressibleFluid` sigue
+  construyéndose con `float` (un `float` es un `ArrayLike` válido, no se
+  ensancha nada). `self._asdict()` sigue devolviendo `dict[str, Any]`, no
+  `dict[str, ArrayLike]` — pasa por compatibilidad con `Any` sin que mypy
+  lo verifique; no se corrigió (construir el dict a mano cuesta repetir los
+  tres nombres, no vale la pena todavía).
 
 ### Abiertas
 
@@ -545,9 +564,6 @@ circuitos cerrados: hidráulica de edificios, procesos con recirculación.
   `test_close_to_supersonic_warns` en `test_beggs_brill_vs_book.py`) —
   `single_phase` ya la tenía. **Abierto**: documentar el límite en el README
   junto con los otros límites físicos declarados.
-- Ubicación de `GradientResult`: hoy vive en `single_phase.py` pero es el
-  contrato compartido con `multiphase.py`. Candidato a `physics/types.py`.
-  Misma pregunta para dónde vive `FluidState`.
 - Port fino del solver 3: revisar `header_network_optimizer.py` y
   `network_observations.py` de mineplanner.
 - **Vectorización por escenarios — alcance corregido (2026-08-13).** `y0`

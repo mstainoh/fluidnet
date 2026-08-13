@@ -10,10 +10,14 @@
 
 **Rol**: contratos base compartidos por toda la capa physics.
 
-- `GradientResult`: `NamedTuple(total, gravity, friction, momentum)` — el
-  tipo de retorno de cualquier función de gradiente (mono o multifásico).
-  Reemplaza la tupla pelada del prototipo 2018; acceso por nombre
-  (`result.friction`) en vez de por índice.
+- `GradientResult`: `NamedTuple(gravity, friction, momentum)` + property
+  `total` (suma de los tres, no un campo almacenado) — el tipo de retorno de
+  cualquier función de gradiente (mono o multifásico), campos `ArrayLike`
+  desde su creación. Reemplaza la tupla pelada del prototipo 2018; acceso
+  por nombre (`result.friction`) en vez de por índice. **Vive en
+  `physics/types.py`**, no en este módulo (movido ahí en el commit
+  `9780d43`; esta sección quedó con la ubicación vieja — corregido
+  2026-08-13, ver ROADMAP "Cerradas").
 - Funciones de gradiente monofásico (Darcy-Weisbach) construidas sobre este
   mismo contrato — comparten `GradientResult` con `multiphase`, lo que
   permite que un solver trate ambos casos de forma uniforme aguas abajo.

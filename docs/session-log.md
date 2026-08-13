@@ -25,6 +25,155 @@
 
 ---
 
+## 2026-08-13 — código: `FluidState` a `ArrayLike` + `IncompressibleFluid.bind()` sin parámetros
+
+> Continuación directa de la sesión anterior del mismo día
+> (`CompressibleFluid` + composición fuera de `bind`). El usuario cambió a
+> mano `SinglePhaseFluidState` de `float` a `ArrayLike` (mismo criterio que
+> `Fluid.bind`/`_state_at` ya usaban con `cast`) y sacó `composition`/
+> `temperature` de `IncompressibleFluid.bind()` — extendiendo a
+> `IncompressibleFluid` la misma lógica que ya se había aplicado a
+> `CompressibleFluid.bind` (#28: si no lo usa, no lo declara). Pidió cerrar
+> la decisión en los docs, no solo en el código.
+
+**Cerrado:**
+
+- **`SinglePhaseFluidState` campos `ArrayLike` (cierra CLAUDE.md #5).**
+  `_state_at` ya no necesita los `cast(float, ...)` — se sacaron. Ver
+  `CLAUDE.md` #5 y "Tipado", y ROADMAP "Cerradas" para el texto final.
+- **Hallazgo al verificar el pedido de "mover `GradientResult` en la misma
+  pasada": `GradientResult` nunca fue `float`.** Es `ArrayLike` desde su
+  creación (`physics/types.py`, commit `9780d43`, nunca modificado desde
+  entonces). La docs (`CLAUDE.md` "Tipado", el corolario de #30, ROADMAP
+  "Abiertas", y el ADR `physics-single-multiphase.md` §1) describían un
+  estado que el código no tenía hace rato — ni el tipo (`float` en vez de
+  `ArrayLike`) ni la ubicación (`single_phase.py` en vez de
+  `physics/types.py`, movido en el mismo commit `9780d43`). No fue
+  causado por esta sesión, pero es exactamente el modo de falla que motivó
+  el pedido: corregido en la misma pasada.
+- **`IncompressibleFluid.bind()` pasa a tomar cero parámetros** (antes
+  aceptaba `composition`/`temperature` y los ignoraba). Rompía 3 tests en
+  `tests/state/test_single_phase_fluids.py` que se los pasaban
+  explícitamente — actualizados:
+  - `test_bind_ignores_composition_and_temperature` → renombrado
+    `test_bind_takes_no_composition_or_temperature`: ahora verifica
+    `TypeError` en vez de "ignorado en silencio" (el contrato cambió de
+    "acepta y descarta" a "no declara").
+  - `test_bind_is_pure_repeated_binds_are_independent` y
+    `test_end_to_end_single_phase_gradient`: sacado `composition=` de las
+    llamadas a `bind()`.
+  - `test_bind_is_keyword_only` → renombrado
+    `test_bind_takes_no_positional_args`: con cero parámetros ya no hay
+    nada "kw-only" que probar; el test que queda es un guardia mínimo
+    contra un positional-arg futuro.
+- `python -m mypy` limpio (14 archivos, incluye `tests/`), `ruff
+  check`/`format` limpios, `pytest tests/` verde (53 passed + 2 xfail).
+
+**Abierto:**
+
+- **`self._asdict()` devuelve `dict[str, Any]`, no `dict[str, ArrayLike]`.**
+  Pasa por compatibilidad con `Any` sin que mypy lo verifique — la firma
+  declarada en `as_physics_kwargs()` no está chequeada por nadie en este
+  punto de contacto con `physics/`. Arreglarlo (construir el dict a mano
+  con los tres nombres) cuesta repetir los nombres; no se hizo porque no
+  vale la pena todavía.
+- Sin cambios: tests de `CompressibleFluid`/`gas.py` sin escribir,
+  `RealGas.compressibility` sin implementar, `Rate`/`ScalarRate` pendiente.
+
+**Próximo paso:**
+
+- Sin cambios respecto de la entrada anterior: decidir entre tests de
+  `CompressibleFluid`/`gas.py` o `Rate`/`ScalarRate`.
+
+---
+
+## 2026-08-13 — código: `CompressibleFluid` (EOS) + composición fuera de `bind`
+
+> Continuación directa de la sesión de código anterior del mismo día
+> (`StateModel` protocol + `IncompressibleFluid` MVP). Arrancó revisando
+> un WIP de `CompressibleFluid`/`temperature_profile.py` antes de seguir
+> codeando; terminó en `src/fluidnet/state/fluids/gas.py`
+> (`IdealGas`/`RealGas`) y en sacar `composition` de `bind` del todo.
+
+**Cerrado:**
+
+- **`temperature_profile.py` eliminado.** Introducía una jerarquía
+  (`TemperatureProfile`/`FixedTemperatureProfile`/`NullTemperatureProfile`/
+  `EdgeTemperatureProfile`) no especificada en ningún lado — #26 ya cierra
+  la discriminación por `callable(field)` directo, sin wrapper
+  intermedio. Además tenía un bug real: la rama de `isinstance(temperature,
+  float)` capturaba antes que la de `TemperatureProfile`, y `None` caía al
+  `else` y tiraba `ValueError` pese a ser el default documentado.
+- **`CompressibleFluid` ahora hereda `ABC`** — antes `@abstractmethod` sin
+  `ABC` no bloqueaba la instanciación directa. Los tres métodos EOS pasan
+  de `return NotImplemented` (singleton de dunders, no de abstractos) a
+  `...`.
+- **`CompressibleFluid.bind` discrimina `temperature` por
+  `callable(temperature)` (#26)**, dos closures hermanas
+  (`bound_callable`/`bound_fixed`) decididas una vez en `bind`, sin tipo
+  intermedio.
+- **`composition` sale de `bind` (y de las tres firmas EOS) por completo**,
+  no solo de las llamadas por-paso. Razón (#28 + corrección #18 del mismo
+  día): la composición no depende de `x`, así que no tiene nada que hacer
+  en el hot loop; pero además la clase base no sabe si el caso es "EOS fijo
+  para toda la red" (se liga en `__init__`, como `IdealGas(molar_weight=...)`)
+  o "composicional" (v1.5, sale de `propagate_rates` en runtime — resuelve
+  ahí quien haga `override` de `bind`). Como no sabe cuál aplica, no declara
+  ninguna. Extraído `_state_at(*, pressure, temperature)` como helper
+  privado para no duplicar los tres `cast` entre las dos closures.
+- **`gas.py` (`IdealGas`/`RealGas`) alineado a la firma nueva** y tres bugs
+  reales corregidos de paso:
+  - `IdealGas.__init__` nunca guardaba el `viscosity` del constructor;
+    `viscosity()` se llamaba a sí mismo (`self.viscosity(...)`) →
+    `RecursionError` garantizado en el primer uso. Guardado en
+    `self._viscosity_fn`.
+  - `IdealGas.compressibility` devolvía `1/(R_specific·T)` — unidades de
+    ρ/P, no de 1/Pa. Corregido a `1/pressure` (para gas ideal β = 1/P
+    exacto, se cancela todo lo demás).
+  - `RealGas.z()` no anidaba bien el chequeo de `Pr`/`Tr` para que mypy
+    angostara `float | None` — reescrito con el `if` directo sobre
+    `self.Pr`/`self.Tr` en vez de pasar por la property
+    `uses_reduced_properties`.
+- **`RealGas.compressibility` deja de devolver `None` en silencio.**
+  Delegaba a `super().compressibility(...)` (el stub abstracto), violando
+  #5 (`FluidState` nunca `float | None`). Convertido a
+  `raise NotImplementedError` explícito — la fórmula real (β = 1/P −
+  (1/Z)(dZ/dP)_T, usando `self.dz_fn`, hoy guardado y sin usar) no se
+  implementó porque no hay convención cerrada de qué devuelve `dz_fn`.
+- `python -m mypy` limpio (14 archivos), `ruff check`/`format` limpios,
+  `pytest tests/` verde (53 passed + 2 xfail, sin regresiones). Smoke test
+  manual de `IdealGas.bind` en ambas ramas de #26 (temperatura fija y
+  perfil callable) — no hay todavía tests formales de `gas.py`/
+  `CompressibleFluid` en `tests/`.
+
+**Abierto:**
+
+- **Tests de `CompressibleFluid`/`gas.py` sin escribir.** `IncompressibleFluid`
+  tiene su batería en `tests/state/test_single_phase_fluids.py`; `gas.py` no
+  tiene ninguna todavía.
+- **`RealGas.compressibility`**: fórmula sin implementar (ver arriba),
+  bloqueada en la convención de `dz_fn`.
+- **`RealGas.density`**: usa `R_specific = spc.R` (constante universal, no
+  específica) con el comentario "assuming molar weight is incorporated in
+  z_fn" — dimensionalmente sospechoso, no se tocó porque no está claro el
+  diseño intencional (¿de dónde sale el peso molecular para un `RealGas`
+  sin `molar_weight` en el constructor?). Candidato a resolverse junto con
+  el ítem de composición→parámetros EOS de v1.5.
+- **Scope**: `CompressibleFluid`/`IdealGas`/`RealGas` son v1.0 según el
+  ROADMAP (`Scope v0.2: IncompressibleFluid ... es suficiente`), sin sesión
+  de diseño que cierre su firma formalmente — se avanzó igual porque venía
+  como "próximo paso" declarado en la entrada anterior del mismo día. Si se
+  sigue construyendo sobre esto (p. ej. `IsothermalGas`), conviene una
+  entrada de diseño que lo cierre explícito.
+- `Rate`/`ScalarRate` sigue sin implementar.
+
+**Próximo paso:**
+
+- Decidir: ¿tests de `CompressibleFluid`/`gas.py` primero, o volver a
+  `Rate`/`ScalarRate` (bloqueante real de v0.2 según el ROADMAP)?
+
+---
+
 ## 2026-08-13 — código: `StateModel` protocol + `IncompressibleFluid` MVP
 
 **Cerrado:**

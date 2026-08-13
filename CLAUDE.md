@@ -92,6 +92,19 @@ Rate ──► composición (intensiva)
    cero). La clase del estado es fija por modelo, así que el parseo es
    estático.
    Se construye una vez por evaluación del gradiente: tiene que ser barato.
+   **Campos `ArrayLike`, no `float` (cerrado 2026-08-13).** Reemplaza la
+   nota de "Tipado" que los daba como abiertos. `SinglePhaseFluidState`
+   (`density`/`viscosity`/`compressibility`) pasa a `ArrayLike`, igual que
+   `GradientResult` — que en realidad **nunca fue `float`**: es `ArrayLike`
+   desde que se creó (`physics/types.py`, commit `9780d43`). No hubo que
+   "mover" nada ahí; la única inconsistencia era la docs (ver ROADMAP
+   Cerradas y el ADR `physics-single-multiphase.md` §1). `IncompressibleFluid`
+   sigue construyéndose con `float` sin cambios — un `float` es un
+   `ArrayLike` válido, no se ensancha nada por escalar. Nota técnica sin
+   resolver: `self._asdict()` devuelve `dict[str, Any]`, no
+   `dict[str, ArrayLike]`; pasa inadvertido bajo compatibilidad con `Any`,
+   pero nadie lo verifica. Construir el dict a mano con los tres nombres lo
+   arreglaría al costo de repetirlos — no vale la pena todavía.
 6. **`temperature` en la firma desde v0.2, default `None` = "no
    suministrado", nunca un valor implícito.** Todo fluido es en general
    función de `(P, T)`; se deja opcional para los casos en que `T` es
@@ -330,10 +343,10 @@ Rate ──► composición (intensiva)
       pasa `y` como `ndarray` siempre, incluso para una ODE escalar (`shape
       (1,)`): tipar `float` documenta un desempaquetado, no un contrato.
       Ensanchar una entrada es gratis — un `float` sigue siendo un
-      `ArrayLike` válido y ningún caller se rompe; distinto de ensanchar una
-      *salida*, que es la decisión que sigue abierta (ver excepción de
-      `FluidState`/`GradientResult` en "Tipado"). `x` queda `float`: es la
-      coordenada del integrador, siempre escalar. Costo declarado en
+      `ArrayLike` válido y ningún caller se rompe; el ensanchado de *salida*
+      corría la misma lógica y **ya se cerró** para `FluidState` (ver #5,
+      2026-08-13; `GradientResult` nunca fue `float`, ver ahí). `x` queda
+      `float`: es la coordenada del integrador, siempre escalar. Costo declarado en
       docstring: las implementaciones deben ser array-safe; en v0.2 se
       documenta, no se testea.
     - **`State.as_physics_kwargs() -> dict[str, ArrayLike]` (corrección
@@ -341,10 +354,11 @@ Rate ──► composición (intensiva)
       `ArrayLike` (ver `friction_factor(re: ArrayLike, ...)`). Tiparlo
       `float` angosta contra un consumidor que no lo pide — la firma de
       salida de la frontera debe coincidir con la de entrada de `physics/`.
-      Esto **no** reabre la decisión abierta sobre los campos de
-      `FluidState`/`GradientResult` (siguen `float` en v0.2): un `float` es
-      un `ArrayLike`, así que la firma del método puede ser ancha sin tocar
-      los campos almacenados. Son dos decisiones distintas.
+      En su momento esto no reabría la decisión sobre los campos de
+      `FluidState`/`GradientResult` — eran dos decisiones distintas, una de
+      firma de método y otra de tipo de campo almacenado. La segunda ya se
+      cerró (#5, 2026-08-13: `FluidState` pasa a `ArrayLike`;
+      `GradientResult` siempre lo fue).
     Firmas: `StateModel.bind(**fields: object) -> BoundState`;
     `BoundState.__call__(*, x: float, across: ArrayLike) -> State`;
     `State.as_physics_kwargs() -> dict[str, ArrayLike]`;
@@ -421,13 +435,12 @@ aplicá directo:
   excepción: pasar sus parámetros a kw-only (decisión cerrada #15) **sí**
   es housekeeping autorizado — no toca el contrato de forma escalar, solo
   cómo se invoca. No lo tomes como pie para vectorizar de paso.
-- Campos de `GradientResult` y de `FluidState`: pasar `float` → `ArrayLike`
-  cambia el contrato de retorno de toda la capa cero. Decisión de diseño
-  abierta. **No confundir con la firma de `State.as_physics_kwargs() ->
-  dict[str, ArrayLike]`, que es otra decisión y ya está cerrada** (#30,
-  2026-08-13): un campo `float` almacenado sigue siendo un `ArrayLike`
-  válido en el dict de salida, así que la firma del método no obliga a
-  tocar los campos.
+- **Cerrado (2026-08-13, ver #5): campos de `FluidState` son `ArrayLike`.**
+  `GradientResult` ya lo era desde su creación (`physics/types.py`, commit
+  `9780d43`) — nunca fue `float`; la afirmación previa de esta sección
+  ("decisión de diseño abierta", "siguen `float`") describía un estado que
+  el código no tenía. Ya no es excepción: tratar como housekeeping normal
+  de tipado.
 - `GradientResult`: no lo conviertas a `dataclass`, no le agregues campos, no
   le agregues `__array__`. Es contrato de capa cero (decisión #25). Si un
   error de mypy parece pedir eso, pará y preguntá.

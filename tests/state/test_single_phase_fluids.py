@@ -36,10 +36,15 @@ class TestIncompressibleFluid:
         state = fluid.bind()(x=0.0, across=1e5)
         assert state.compressibility == 0.0
 
-    def test_bind_ignores_composition_and_temperature(self) -> None:
+    def test_bind_takes_no_composition_or_temperature(self) -> None:
+        """Properties are fixed at construction (#28): IncompressibleFluid
+        uses neither field, so bind() does not declare them at all — passing
+        either is a TypeError, not a silent no-op."""
         fluid = IncompressibleFluid(density=1000.0, viscosity=1e-3)
-        state = fluid.bind(composition={"water": 1.0}, temperature=350.0)(x=0.0, across=1e5)
-        assert state == SinglePhaseFluidState(density=1000.0, viscosity=1e-3, compressibility=0.0)
+        with pytest.raises(TypeError):
+            fluid.bind(composition={"water": 1.0})  # type: ignore[call-arg]
+        with pytest.raises(TypeError):
+            fluid.bind(temperature=350.0)  # type: ignore[call-arg]
 
     def test_bound_state_ignores_x_and_across(self) -> None:
         """Degenerate scalar branch of #26: the bound state does not depend
@@ -51,20 +56,20 @@ class TestIncompressibleFluid:
         """bind() is partial application, not construction (#18): it must not
         mutate the Fluid, so independent binds/evaluations never interfere."""
         fluid = IncompressibleFluid(density=1000.0, viscosity=1e-3)
-        bound_a = fluid.bind(composition={"water": 1.0})
+        bound_a = fluid.bind()
         bound_a(x=0.0, across=1e5)
-        bound_b = fluid.bind(composition={"brine": 1.0})
+        bound_b = fluid.bind()
         assert bound_b(x=0.0, across=1e5) == bound_a(x=99.0, across=9e5)
 
-    def test_bind_is_keyword_only(self) -> None:
-        """Kw-only per §13: an arg-order bug (composition/temperature swap)
-        cannot recur."""
+    def test_bind_takes_no_positional_args(self) -> None:
+        """bind() declares zero fields (#28) — no composition/temperature to
+        be kw-only about anymore, but a positional call must still fail."""
         fluid = IncompressibleFluid(density=1000.0, viscosity=1e-3)
         with pytest.raises(TypeError):
-            fluid.bind({"water": 1.0})  # type: ignore[misc]
+            fluid.bind({"water": 1.0})  # type: ignore[call-arg]
 
     def test_end_to_end_single_phase_gradient(self) -> None:
         fluid = IncompressibleFluid(density=1000.0, viscosity=1e-3, compressibility=0.0)
-        state = fluid.bind(composition={"water": 1.0})(x=0.0, across=5e5)
+        state = fluid.bind()(x=0.0, across=5e5)
         result = single_phase_gradient(mass_rate=10.0, D=0.1, **state.as_physics_kwargs())
         assert result.total < 0
