@@ -174,10 +174,22 @@ Rate ──► composición (intensiva)
     `LossFunc`, que *es* la constitutiva).
 
     ```
-    StateModel.bind(*, composition, **fields) -> BoundState   # 1× por eje
-    BoundState.__call__(*, x, across) -> State                 # 1× por paso
+    StateModel.bind(**fields: object) -> BoundState             # 1× por eje
+    BoundState.__call__(*, x, across) -> State                  # 1× por paso
     ```
 
+    - **`composition` sale del `Protocol` (corrección 2026-08-13).** No todo
+      `StateModel` tiene composición — un modelo de agua dulce se parametriza
+      solo por `T`. Forzarla en la firma neutra es el mismo error que forzar
+      `temperature` (ver más abajo): la composición pasa a ser un campo más,
+      declarado por la implementación concreta (`Fluid.bind(*, composition,
+      temperature=None)`), que es donde hay información para tipar.
+    - **La distinción propagado/prescrito se muda al solver (2026-08-13).**
+      El `Protocol` ya no la codifica; la codifica quien arma los kwargs de
+      `bind`: `model.bind(**propagated_fields(rate),
+      **prescribed_fields(G, u, v))`. Sigue siendo la distinción que sostiene
+      el límite declarado en #27 (los prescritos no se balancean en nodos; la
+      composición viaja por la topología) — documentada en el ADR, no tipada.
     - **La cadena anidada `comp → T → P` es binding time**, no nesting
       sintáctico: el orden es por frecuencia de cambio. Fijadas composición y
       campos prescritos, la parcial que queda es sólo función de `across` —
@@ -313,11 +325,29 @@ Rate ──► composición (intensiva)
     misma evidencia en contra del diferencial physics-agnostic que motivó el
     nombre neutro. Hacia abajo, `pressure` ya está en `physics/`, es el
     vocabulario del dominio, y renombrarlo tocaría capa cero testeada.
-    Traducción en el `__call__` del `BoundState`, una línea. Consecuencia
-    buscada: cuando entre la vectorización por escenarios, `across: float |
-    ArrayLike` cambia sólo en el `Protocol`.
-    Firmas: `StateModel.bind(*, composition, **fields) -> BoundState`;
-    `BoundState.__call__(*, x: float, across: float) -> State`;
+    Traducción en el `__call__` del `BoundState`, una línea.
+    - **`across: ArrayLike`, no `float` (corrección 2026-08-13).** `solve_ivp`
+      pasa `y` como `ndarray` siempre, incluso para una ODE escalar (`shape
+      (1,)`): tipar `float` documenta un desempaquetado, no un contrato.
+      Ensanchar una entrada es gratis — un `float` sigue siendo un
+      `ArrayLike` válido y ningún caller se rompe; distinto de ensanchar una
+      *salida*, que es la decisión que sigue abierta (ver excepción de
+      `FluidState`/`GradientResult` en "Tipado"). `x` queda `float`: es la
+      coordenada del integrador, siempre escalar. Costo declarado en
+      docstring: las implementaciones deben ser array-safe; en v0.2 se
+      documenta, no se testea.
+    - **`State.as_physics_kwargs() -> dict[str, ArrayLike]` (corrección
+      2026-08-13).** Su consumidor es `gradient_fn`, que ya acepta
+      `ArrayLike` (ver `friction_factor(re: ArrayLike, ...)`). Tiparlo
+      `float` angosta contra un consumidor que no lo pide — la firma de
+      salida de la frontera debe coincidir con la de entrada de `physics/`.
+      Esto **no** reabre la decisión abierta sobre los campos de
+      `FluidState`/`GradientResult` (siguen `float` en v0.2): un `float` es
+      un `ArrayLike`, así que la firma del método puede ser ancha sin tocar
+      los campos almacenados. Son dos decisiones distintas.
+    Firmas: `StateModel.bind(**fields: object) -> BoundState`;
+    `BoundState.__call__(*, x: float, across: ArrayLike) -> State`;
+    `State.as_physics_kwargs() -> dict[str, ArrayLike]`;
     `Fluid.bind(*, composition, temperature=None)`;
     `Fluid.get_state(*, composition, temperature, pressure)`.
 
@@ -393,7 +423,11 @@ aplicá directo:
   cómo se invoca. No lo tomes como pie para vectorizar de paso.
 - Campos de `GradientResult` y de `FluidState`: pasar `float` → `ArrayLike`
   cambia el contrato de retorno de toda la capa cero. Decisión de diseño
-  abierta.
+  abierta. **No confundir con la firma de `State.as_physics_kwargs() ->
+  dict[str, ArrayLike]`, que es otra decisión y ya está cerrada** (#30,
+  2026-08-13): un campo `float` almacenado sigue siendo un `ArrayLike`
+  válido en el dict de salida, así que la firma del método no obliga a
+  tocar los campos.
 - `GradientResult`: no lo conviertas a `dataclass`, no le agregues campos, no
   le agregues `__array__`. Es contrato de capa cero (decisión #25). Si un
   error de mypy parece pedir eso, pará y preguntá.

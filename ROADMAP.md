@@ -461,6 +461,14 @@ circuitos cerrados: hidráulica de edificios, procesos con recirculación.
   de la implementación, no del valor. *(2026-08-10)*
 - **Campos prescritos = datos, no conservados**: sin balance en nodos.
   *(2026-08-10)*
+- **Corrección de `StateModel`/`BoundState` (2026-08-13).** `composition`
+  sale del `Protocol` (pasa a ser un campo más de `Fluid.bind`); la
+  distinción propagado/prescrito se muda al solver (quien arma los kwargs de
+  `bind`); `across: ArrayLike` (no `float`) porque `solve_ivp` siempre
+  entrega `ndarray`; `State.as_physics_kwargs() -> dict[str, ArrayLike]`
+  para calzar con la entrada de `physics/`. No reabre la decisión abierta
+  sobre los campos almacenados de `FluidState`/`GradientResult`. Ver
+  `CLAUDE.md` #18/#30 y ADR §2.1bis.
 
 ### Abiertas
 
@@ -510,14 +518,33 @@ circuitos cerrados: hidráulica de edificios, procesos con recirculación.
   Misma pregunta para dónde vive `FluidState`.
 - Port fino del solver 3: revisar `header_network_optimizer.py` y
   `network_observations.py` de mineplanner.
-- **Vectorización por escenarios** (`y0` como array de N condiciones iniciales
-  independientes → una evaluación vectorizada del `rhs` por paso en vez de N).
-  Es la forma exacta del loop interno del fitting de v0.5. **No confundir con
-  vectorizar la integración en `x`, que es imposible** (el paso `n+1` depende
-  del `n`). Bloqueante: `_beggs_brill_detailed` es escalar-only — esto sube la
-  prioridad de ese `xfail`, que no era sólo deuda de multifásico.
+- **Vectorización por escenarios — alcance corregido (2026-08-13).** `y0`
+  como array de N condiciones iniciales independientes para una evaluación
+  vectorizada del `rhs` por paso en vez de N. **No confundir con vectorizar
+  la integración en `x`, que es imposible** (el paso `n+1` depende del `n`),
+  ni con `vectorized=True` de `solve_ivp` (eso paraleliza el Jacobiano por
+  diferencias finitas del *mismo* sistema, no corre sistemas independientes
+  — ver tabla en ADR §2.1bis).
+  `solve_ivp` **no integra escenarios independientes de forma nativa**.
+  Apilarlos es legítimo (Jacobiano diagonal) pero paga control de paso
+  compartido — el escenario más rígido impone el paso, y los resultados no
+  son bit-idénticos a integrar por separado. En BDF/Radau hace falta
+  `jac_sparsity` o el Jacobiano queda denso N×N. La alternativa es un
+  for-loop por escenario: más lento, numéricamente más limpio. Cuál gana se
+  mide en v0.5, no se decide ahora.
+  Si los escenarios difieren en el `rate` y no sólo en `y0` — el caso real
+  del fitting contra datos de campo — entonces `rate_kwargs` también tiene
+  que ser array: la vectorización no es sólo `across`, es todo el kwargs
+  bundle que entra a `gradient_fn`. `_beggs_brill_detailed` (escalar-only)
+  no es la única pieza bloqueante.
   Requisito derivado sobre las implementaciones de `StateModel`: `get_state`
   tiene que ser array-safe. Se documenta, no se tipa.
+- **Layout de `across` cuando tiene largo > 1.** Un `ndarray` de largo 2 es
+  indistinguible entre "dos escenarios desacoplados" y "`[P, T]` acoplado"
+  (o `[Re, Im]` para el demo AC — `solve_ivp` no integra estado complejo,
+  hay que desdoblar). El layout es propiedad de la **implementación** del
+  `StateModel`, no del valor — mismo criterio que el número de fases
+  (`CLAUDE.md` #5). Diseño de v0.5/v2, no bloquea v0.2. *(2026-08-13)*
 - **Jacobiano sparse estructural en `mass_balance`.** Es la matriz de
   incidencia, conocida de antemano; pasársela a `scipy.optimize.root` es O(1)
   bloque vs. O(E) evaluaciones por iteración de la estimación por diferencias
