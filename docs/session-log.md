@@ -25,6 +25,78 @@
 
 ---
 
+## 2026-08-13 — código: `StateModel` protocol + `IncompressibleFluid` MVP
+
+**Cerrado:**
+
+- **Corrección de sesión de diseño 2026-08-13, aplicada a `CLAUDE.md` #18/#30
+  y ADR §2.1bis** (commit `71af608` en `dev`, mergeado a esta rama sin
+  conflictos): `composition` sale del `Protocol` neutro; la distinción
+  propagado/prescrito se muda al solver; `across: ArrayLike` (no `float`,
+  porque `solve_ivp` siempre entrega `ndarray`); `State.as_physics_kwargs()
+  -> dict[str, ArrayLike]`. Ver también la tabla de los tres casos de
+  vectorización (`vectorized=True` / escenarios apilados / potencial
+  acoplado) que cierra esa sección del ADR.
+- **`state/protocol.py`**: `StateModel`, `BoundState`, `State` como
+  `Protocol`, ya con la firma corregida.
+- **`state/fluids/single_phase_fluids.py`**: `SinglePhaseFluidState`
+  (`NamedTuple` con `density`/`viscosity`/`compressibility` — nombres
+  canónicos de `single_phase_gradient`, #21) y `IncompressibleFluid`
+  (props constantes fijadas en `__init__`, ignora `composition`/
+  `temperature`; `bind()` devuelve un `BoundState` que ignora `x`/`across`
+  — la rama degenerada/escalar de #26). Es el MVP de Capa 0 bis declarado
+  en el ROADMAP para v0.2.
+- **Hallazgo técnico**: `typing.NamedTuple` no admite agregar campos vía
+  subclase, ni combinarse con un mixin plano en el mismo `class` — se probó
+  y ambos casos tiran `TypeError`. Se descartó el patrón `BaseState`/
+  `BaseFluid` (que intentaba compartir `as_physics_kwargs()` por herencia);
+  cada `State` concreto lo implementa inline sobre `self._asdict()`, que ya
+  es gratis.
+- **`get_state` sacado de `IncompressibleFluid`**: se había agregado
+  siguiendo la firma de la decisión #4 (`Fluid.get_state(*, pressure,
+  temperature=None, composition=...)`), pero no estaba conectado a
+  `bind`/`bound` — el estado se cachea en `__init__`, no se deriva. Vuelve
+  el día que exista un `Fluid` que sí derive `(P, T, composición) ->
+  FluidState` (p. ej. `IsothermalGas`).
+- **Batería de tests: `tests/state/test_single_phase_fluids.py` (10
+  tests)**. Qué prueban:
+  - `SinglePhaseFluidState`: construcción por keyword, inmutabilidad
+    (`NamedTuple`), que `as_physics_kwargs()` emita exactamente los nombres
+    canónicos `{density, viscosity, compressibility}`, y que ese dict entre
+    sin fricción a `single_phase_gradient` (integración real, no mock).
+  - `IncompressibleFluid`: `compressibility` default `0.0`; `bind()` ignora
+    `composition`/`temperature` sin importar qué se le pase; el estado
+    ligado es el mismo sin importar `x`/`across` (rama degenerada de #26);
+    binds independientes no interfieren entre sí (`bind` es aplicación
+    parcial pura, no muta el `Fluid`, #18); `bind` es keyword-only (#13);
+    y un smoke test end-to-end `bind → BoundState → as_physics_kwargs() →
+    single_phase_gradient`.
+  - No cubierto todavía: la rama *callable* de #26 (perfil `T(x)`) —
+    `IncompressibleFluid` ignora `temperature` por completo, así que no la
+    ejercita. Queda pendiente para el próximo `Fluid` no constante.
+- `python -m mypy` limpio (13 archivos), `ruff check`/`format` limpios,
+  suite completa (`pytest tests/`) en verde: 53 passed + 2 xfail esperados.
+
+**Abierto:**
+
+- **`state/fluids/` (plural) vs. decisión #16.** Ver ROADMAP §Abiertas —
+  no hay colisión de import real, pero sí de lectura (`import fluids` de
+  ChEDL en tests vs. `fluidnet.state.fluids`). Falta decisión: reabrir #16
+  para el caso anidado, o renombrar a `state/fluid/`.
+- `MultiPhaseFluidState` / `multiphase_fluids.py` (mencionado en el
+  docstring del módulo) — no empezado.
+- `Rate`/`ScalarRate` sigue sin implementar (siguiente pieza según
+  Secuencia inmediata #5).
+
+**Próximo paso:**
+- Decidido en cierre de sesión: siguiente `Fluid` a implementar es
+  **compresible** (deriva `density` de `P`, ejercita la rama callable de
+  #26 y el discriminador `AlgebraicLoss`/`IntegralLoss` de #7) y
+  **multifásico** (`MultiPhaseFluidState`, convención de sufijos #19).
+  `Rate`/`ScalarRate` queda pendiente en paralelo.
+
+---
+
 ## 2026-08-10 — diseño: `StateModel` ligado por eje
 
 **Cerrado:**

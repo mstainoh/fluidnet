@@ -156,17 +156,18 @@ cuando un solver o una `loss_func` lo requiera — nunca por completitud física
 
 ---
 
-## Capa 0 bis — `Fluid` · DISEÑO CERRADO, SIN IMPLEMENTAR
+## Capa 0 bis — `Fluid` · IMPLEMENTACIÓN INICIADA (2026-08-13)
 
 Hermana de `physics/`, mismo contrato de capa cero: función pura, SI, sin
 conocer nada de arriba. **Fábrica stateless de `FluidState`.**
 
 ```
-StateModel.bind(*, composition, **fields) -> BoundState   # 1× por eje
-BoundState.__call__(*, x, across) -> State                # 1× por evaluación
+StateModel.bind(**fields: object) -> BoundState             # 1× por eje
+BoundState.__call__(*, x: float, across: ArrayLike) -> State # 1× por evaluación
+State.as_physics_kwargs() -> dict[str, ArrayLike]
 
 Fluid.bind(*, composition, temperature=None) -> BoundState
-FluidState: SinglePhaseState | MultiPhaseState  (NamedTuple + as_physics_kwargs)
+FluidState: SinglePhaseFluidState | MultiPhaseFluidState  (NamedTuple + as_physics_kwargs)
 ```
 
 - Lo que vive en la red/nodo no es *un fluido con densidad 1000*, es el
@@ -178,6 +179,24 @@ FluidState: SinglePhaseState | MultiPhaseState  (NamedTuple + as_physics_kwargs)
 
 **Scope v0.2**: `IncompressibleFluid` (agua/salmuera simple, ignora `T`) es
 suficiente. `IsothermalGas` y fluidos composicionales llegan en v1.0/v1.5.
+
+**Hecho (sesión de código 2026-08-13)**:
+
+- `state/protocol.py` — `StateModel`, `BoundState`, `State` como `Protocol`,
+  con la firma corregida (composición fuera del `Protocol`, `across:
+  ArrayLike`).
+- `state/fluids/single_phase_fluids.py` — `SinglePhaseFluidState`
+  (`NamedTuple`: `density`/`viscosity`/`compressibility`, nombres canónicos
+  de `single_phase_gradient`) + `IncompressibleFluid` (props constantes,
+  MVP de esta capa). `MultiPhaseFluidState` y el resto de `IsothermalGas`
+  quedan para cuando entren en scope (v0.5/v1.0).
+  El paquete se llama `fluids/` (plural) — **tensión sin resolver con la
+  decisión #16** (colisión visual con `fluids` de ChEDL), ver Abiertas.
+- `tests/state/test_single_phase_fluids.py` — 10 tests: construcción e
+  inmutabilidad de `SinglePhaseFluidState`, nombres canónicos de
+  `as_physics_kwargs()`, integración end-to-end con `single_phase_gradient`,
+  `IncompressibleFluid.bind` es kw-only y no muta el `Fluid`, y la rama
+  degenerada de #26 (el estado ligado ignora `x`/`across`).
 
 ---
 
@@ -367,7 +386,10 @@ circuitos cerrados: hidráulica de edificios, procesos con recirculación.
 4. ~~Mecanismo de `@diagnostic`~~ — **cerrado (2026-08-10), ya no bloquea.**
    `darcy_weisbach` se implementa sin él.
 5. **Implementar** por piezas chicas siguiendo el mapa de rescate del ADR §3,
-   commiteando de a poco contra `main` limpia.
+   commiteando de a poco contra `main` limpia. **En curso (2026-08-13)**:
+   `state/protocol.py` + `state/fluids/single_phase_fluids.py`
+   (`SinglePhaseFluidState` + `IncompressibleFluid` MVP) con tests. Sigue
+   `Rate`/`ScalarRate`, luego `Network`/solver 1.
 
 ---
 
@@ -471,6 +493,16 @@ circuitos cerrados: hidráulica de edificios, procesos con recirculación.
   `CLAUDE.md` #18/#30 y ADR §2.1bis.
 
 ### Abiertas
+
+- **`state/fluids/` (plural) vs. decisión #16.** #16 fija `fluidnet/fluid.py`
+  (singular) para evitar colisión visual con `fluids` (ChEDL, oráculo de
+  cross-validation en tests). La sesión de código del 2026-08-13 armó en
+  cambio un paquete `state/fluids/` — motivo real: agrupar variantes
+  (`single_phase_fluids.py`, y a futuro `multiphase_fluids.py`) en vez de un
+  módulo único. No hay colisión de import (`fluidnet.state.fluids` es un
+  path distinto de `fluids`), pero sí queda `from fluidnet.state.fluids
+  import ...` conviviendo con `import fluids` en el mismo repo. Pendiente:
+  ¿reabrir #16 para el caso anidado, o renombrar a `state/fluid/`? *(2026-08-13)*
 
 - **¿Adelantar el segundo dominio demo de v2.0 a v0.5?** La fila
   "physics-agnostic" de la tabla de diferenciales es la más débil: está
