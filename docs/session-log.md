@@ -25,6 +25,70 @@
 
 ---
 
+## 2026-08-13 — código: test de `RealGas`/`IdealGas` (metano) + fix `RealGas.density` sin `molar_weight`
+
+> Continuación directa de la sesión anterior del mismo día (`CompressibleFluid`
+> EOS). Pedido: agregar tests de gas verificando densidad del metano a
+> condiciones estándar (0°C, 1 atm) ≈0.717 kg/m³, viscosidad constante
+> 10.84e-6 Pa·s, y que un `RealGas` con `z=1` constante (`dZ/dP=0`) dé
+> resultados idénticos a `IdealGas`. Al armar la comparación se encontró que
+> `RealGas` no tenía cómo dar ese resultado.
+
+**Cerrado:**
+
+- **Bug real en `RealGas.density` corregido: faltaba `molar_weight`.**
+  Usaba `R_specific = spc.R` (constante universal, sin dividir por peso
+  molecular) con el comentario "assuming molar weight is incorporated in
+  z_fn" — con `z=1` eso devolvía densidad *molar* (44.6 mol/m³ a
+  condiciones estándar), no másica. Verificado numéricamente: multiplicar
+  ese resultado por el peso molecular del metano (0.016043 kg/mol) da
+  0.7158 kg/m³, coincide con la densidad másica esperada — confirma que
+  faltaba exactamente ese factor, no un error de otra naturaleza. Se agregó
+  `molar_weight: float` al constructor de `RealGas` (mismo parámetro que
+  `IdealGas`) y `density()` pasa a `R_specific = spc.R / self.molar_weight`,
+  misma fórmula que `IdealGas`. **Cierra el ítem "Abierto" de la entrada
+  anterior** ("`RealGas.density`: usa `R_specific = spc.R` ...
+  dimensionalmente sospechoso"). `compressibility()` no necesitó cambios:
+  β = 1/P − (1/Z)(dZ/dP) no depende de M (se cancela en la derivada
+  logarítmica de ρ).
+  Antes de tocar el código se preguntó al usuario cómo reconciliar el bug
+  (CLAUDE.md #2, no implementar sin decisión cerrada, en vez de asumir un
+  fix o un workaround solo en el test) — eligió arreglar `RealGas`.
+- **`tests/state/test_gas.py` (nuevo).** `TestIdealGasMethane`: densidad
+  del metano a 0°C/1 atm ≈0.717 kg/m³ (`rel=1e-2`, la fuente da valor
+  redondeado), viscosidad constante, compresibilidad = 1/P.
+  `TestRealGasMatchesIdealGasWhenZIsOne`: `RealGas(z_fn=1, dz_fn=0)`
+  reproduce exactamente densidad/compresibilidad/viscosidad de `IdealGas`
+  con el mismo `molar_weight`, y también da ≈0.717 kg/m³ standalone.
+  Nota de implementación: `bound(x=..., across=...)` indexa `across[0]`
+  (`CompressibleFluid.bind`, `single_phase_fluids.py`), así que los tests
+  pasan `across=np.array([spc.atm])`, no un escalar.
+- `python -m pytest tests/` verde (63 recolectados incl. los 7 nuevos, 2
+  xfail sin cambios), `python -m mypy` limpio (14 archivos), `ruff
+  check`/`format` limpios (`test_gas.py` reformateado por `ruff format`;
+  los 3 errores preexistentes de `test_multiphase_vector_1.py` no se
+  tocaron).
+
+**Abierto:**
+
+- **`RealGas.compressibility` sigue sin verificar contra literatura/`fluids`
+  con `dZ/dP != 0`.** Hoy solo se probó el caso degenerado (`dZ/dP=0`),
+  donde el término nuevo se anula y coincide con `IdealGas` por
+  construcción — no prueba la fórmula completa.
+- **`RealGas` con un z-factor de literatura real (Standing-Katz,
+  Dranchuk-Abou-Kassem, etc.) sin probar.** Todo lo hecho hoy usa `z=1`
+  constante como caso degenerado de verificación cruzada, no un fluido real.
+- Sigue sin `Rate`/`ScalarRate` (bloqueante real de v0.2 según ROADMAP,
+  postergado otra vez).
+
+**Próximo paso:**
+
+- Sesión próxima: (1) probar `RealGas` con una correlación de z-factor real
+  (no `z=1` constante) contra un caso de literatura/`fluids`; (2) arrancar
+  el esquema multifásico (`MultiPhaseState`, sufijos de fase — #19).
+
+---
+
 ## 2026-08-13 — código: `FluidState` a `ArrayLike` + `IncompressibleFluid.bind()` sin parámetros
 
 > Continuación directa de la sesión anterior del mismo día
