@@ -159,9 +159,32 @@ intercambio de masa); los campos prescritos son función conocida de `x`; el
 potencial es la incógnita, que cambia en cada evaluación del gradiente.
 
 ```
-StateModel.bind(*, composition, **fields) -> BoundState    # 1× por eje
-BoundState.__call__(*, x, across) -> State                 # 1× por evaluación
+StateModel.bind(**fields: object) -> BoundState              # 1× por eje
+BoundState.__call__(*, x, across) -> State                   # 1× por evaluación
 ```
+
+**`composition` sale del `Protocol`** *(corrección 2026-08-13)*. No todo
+`StateModel` tiene composición — un modelo de agua dulce se parametriza solo
+por `T`. Forzarla en la firma neutra es el mismo error que forzar
+`temperature`, ya descartado más abajo: la composición pasa a ser un campo
+más, declarado por la implementación concreta (`Fluid.bind(*, composition,
+temperature=None)`), que es donde hay información para tipar.
+
+**La distinción propagado/prescrito se muda al solver** *(corrección
+2026-08-13)*. El `Protocol` ya no la codifica; la codifica quien arma los
+kwargs de `bind`:
+
+```
+bound = model.bind(
+    **propagated_fields(rate),      # de propagate_rates: composición
+    **prescribed_fields(G, u, v),   # de atributos declarados: T, etc.
+)
+```
+
+Sigue siendo la distinción que sostiene el límite declarado más abajo
+("campos prescritos son datos, no cantidades conservadas"): los prescritos
+no se balancean en nodos, la composición viaja por la topología. Queda
+documentada acá, no tipada en el `Protocol`.
 
 **Es aplicación parcial, no construcción.** La distinción es indiferente para
 el intérprete y decisiva para la arquitectura: la composición sale de
@@ -216,8 +239,38 @@ physics-agnostic que motivó el nombre neutro (ver arriba, "que el protocolo se
 llame `Fluid`"). Hacia abajo, `pressure` ya está en `physics/`, es el
 vocabulario del dominio, y renombrarlo tocaría capa cero testeada. La
 traducción vive en el `__call__` del `BoundState` concreto, una línea.
-Consecuencia buscada: cuando entre la vectorización por escenarios, `across:
-float | ArrayLike` cambia sólo en el `Protocol`.
+
+**`across: ArrayLike`, no `float`** *(corrección 2026-08-13)*. `solve_ivp`
+pasa `y` como `ndarray` siempre, incluso para una ODE escalar (`shape
+(1,)`): tipar `float` documenta un desempaquetado, no un contrato. Ensanchar
+una entrada es gratis — un `float` sigue siendo un `ArrayLike` válido y
+ningún caller se rompe; distinto de ensanchar una *salida*, que sigue
+abierto (campos de `FluidState`/`GradientResult`, ver `CLAUDE.md`). `x`
+queda `float`: es la coordenada del integrador, siempre escalar. Costo
+declarado en docstring: las implementaciones deben ser array-safe; en v0.2
+se documenta, no se testea.
+
+**`State.as_physics_kwargs() -> dict[str, ArrayLike]`** *(corrección
+2026-08-13)*. Su consumidor es `gradient_fn`, que ya acepta `ArrayLike` (ver
+`friction_factor(re: ArrayLike, ...)`); tiparlo `float` angosta contra un
+consumidor que no lo pide, y la firma de salida de esta frontera debe
+coincidir con la de entrada de `physics/`. No reabre la decisión abierta
+sobre los campos almacenados de `FluidState`/`GradientResult` (siguen
+`float` en v0.2): un `float` es un `ArrayLike`, así que la firma del método
+puede ser ancha sin tocar los campos. Son dos decisiones distintas.
+
+Protocolo resultante:
+
+```python
+class StateModel(Protocol):
+    def bind(self, **fields: object) -> BoundState: ...
+
+class BoundState(Protocol):
+    def __call__(self, *, x: float, across: ArrayLike) -> State: ...
+
+class State(Protocol):
+    def as_physics_kwargs(self) -> dict[str, ArrayLike]: ...
+```
 
 **Propiedades por fase; la mezcla la calcula `physics`.** *(sin cambios — ver
 convención de sufijos.)* La forma concreta del estado queda cerrada:
@@ -238,12 +291,27 @@ dominios adicionales se admiten como campos prescritos.** Esa frase explica
 de una sola vez por qué el problema es ODE y no PDE, por qué v2 es aditivo y
 qué abre v2.0+.
 
-**Sobre la vectorización.** La integración en `x` no es vectorizable: el paso
-`n+1` depende del `n`. El eje vectorizable es el de **escenarios** — `y0`
-como array de N condiciones iniciales independientes, N ODEs desacopladas en
-una pasada, una evaluación vectorizada del `rhs` por paso en vez de N. Es la
-forma del loop interno del fitting de v0.5, y el motivo por el que las
-implementaciones de `StateModel` deben ser array-safe.
+**Sobre la vectorización — cierre 2026-08-13.** La integración en `x` no es
+vectorizable: el paso `n+1` depende del `n`. La array-safety de `get_state`
+y de `gradient_fn` es **una sola restricción de diseño que habilita tres
+cosas distintas** — y conviene no confundirlas:
+
+| Caso | Qué es | Qué compra |
+|---|---|---|
+| `vectorized=True` de `solve_ivp` | `(n, k)`: k puntos de prueba del mismo sistema en el mismo `t` | Jacobiano por diferencias finitas en 1 llamada en vez de n — real en BDF/Radau |
+| Escenarios apilados | `(N,)`: N sistemas con Jacobiano diagonal | N corridas en una pasada |
+| Potencial acoplado | `(2,)`: `[P, T]` o `[Re, Im]` — componentes ligadas | v2 sin tocar el protocolo |
+
+`vectorized=True` **no** sirve para escenarios: sus columnas comparten `t`,
+comparten paso y no aparecen en `sol.y`. Es una confusión que el nombre
+invita a cometer.
+
+La formulación correcta no es "soportamos escenarios" sino: **las
+implementaciones de `StateModel` deben ser array-safe elementwise sobre el
+último eje.** De esa única restricción se derivan los tres casos de la
+tabla. El caso "escenarios apilados" es la forma del loop interno del
+fitting de v0.5 — ver ROADMAP §Abiertas para el alcance real de ese caso
+(no es tan directo como "apilar y listo").
 
 ### 2.2 loss_func — dos protocolos, no uno
 
