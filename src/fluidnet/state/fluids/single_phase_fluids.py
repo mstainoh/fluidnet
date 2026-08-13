@@ -16,7 +16,7 @@ import numpy as np
 import numpy.typing as npt
 
 from fluidnet.physics.types import ArrayLike
-from fluidnet.state.protocol import BoundState
+from fluidnet.state.protocol import BoundStateModel
 
 
 class SinglePhaseFluidState(NamedTuple):
@@ -50,7 +50,7 @@ class IncompressibleFluid:
 
     def bind(
         self,
-    ) -> BoundState:
+    ) -> BoundStateModel[SinglePhaseFluidState]:
         state = self._state
 
         def bound(*, x: float, across: ArrayLike) -> SinglePhaseFluidState:
@@ -108,7 +108,7 @@ class CompressibleFluid(ABC):
         self,
         *,
         temperature: float | Callable[[float], float] | None = None,
-    ) -> BoundState:
+    ) -> BoundStateModel[SinglePhaseFluidState]:
         if callable(temperature):
             profile = temperature
 

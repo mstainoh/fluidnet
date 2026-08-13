@@ -3,7 +3,7 @@
 Two pieces, deliberately separate:
 
 ``protocol``
-    ``StateModel`` / ``BoundState`` / ``State`` — the domain-neutral
+    ``StateModel`` / ``BoundStateModel`` / ``State`` — the domain-neutral
     ``Protocol``. Knows nothing about fluids; the same shape fits an
     electrical AC demo.
 ``fluids``
@@ -16,11 +16,11 @@ See ``CLAUDE.md`` decisions #4-#7, #18, #19, #26, #28, #30 and
 """
 
 from .fluids import IncompressibleFluid, SinglePhaseFluidState
-from .protocol import BoundState, State, StateModel
+from .protocol import BoundStateModel, State, StateModel
 
 __all__ = [
     "StateModel",
-    "BoundState",
+    "BoundStateModel",
     "State",
     "SinglePhaseFluidState",
     "IncompressibleFluid",

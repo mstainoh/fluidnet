@@ -159,8 +159,8 @@ intercambio de masa); los campos prescritos son función conocida de `x`; el
 potencial es la incógnita, que cambia en cada evaluación del gradiente.
 
 ```
-StateModel.bind(**fields: object) -> BoundState              # 1× por eje
-BoundState.__call__(*, x, across) -> State                   # 1× por evaluación
+StateModel.bind(**fields: object) -> BoundStateModel         # 1× por eje
+BoundStateModel.__call__(*, x, across) -> State               # 1× por evaluación
 ```
 
 **`composition` sale del `Protocol`** *(corrección 2026-08-13)*. No todo
@@ -204,7 +204,7 @@ formas posibles de lograrlo no son equivalentes:
 | `__call__(*, across, **fields)` | muere con `mypy strict`; obliga a `loss_func` a saber qué campos existen en el dominio, o sea a traducir |
 | `__call__(*, x, across)` | `x` no es magnitud física sino coordenada del eje: existe en todo dominio y ya está en el vocabulario del integrador |
 
-El perfil queda capturado en el closure del `BoundState`, y la firma de
+El perfil queda capturado en el closure del `BoundStateModel`, y la firma de
 `bind` la declara la implementación concreta (`Fluid.bind(composition,
 temperature=None)`). Consecuencia buscada: **agregar perfiles de temperatura
 en v2 no toca `physics/`, ni `loss_func`, ni el protocolo** — toca el parser
@@ -222,9 +222,9 @@ decidida por `callable(field)` fuera del loop.
 cadena completa:
 
 ```
-StateModel → bind → BoundState → (x, across) → State
-                                                  → as_physics_kwargs()
-rate.as_physics_kwargs() ───────────────────────→ gradient_fn ← edge_attrs
+StateModel → bind → BoundStateModel → (x, across) → State
+                                                       → as_physics_kwargs()
+rate.as_physics_kwargs() ────────────────────────────→ gradient_fn ← edge_attrs
 ```
 
 **Regla general que ordena la capa**: *todo lo que no depende de `x` se liga
@@ -238,35 +238,55 @@ diseño: `pressure` ahí es la misma evidencia en contra del diferencial
 physics-agnostic que motivó el nombre neutro (ver arriba, "que el protocolo se
 llame `Fluid`"). Hacia abajo, `pressure` ya está en `physics/`, es el
 vocabulario del dominio, y renombrarlo tocaría capa cero testeada. La
-traducción vive en el `__call__` del `BoundState` concreto, una línea.
+traducción vive en el `__call__` del `BoundStateModel` concreto, una línea.
 
 **`across: ArrayLike`, no `float`** *(corrección 2026-08-13)*. `solve_ivp`
 pasa `y` como `ndarray` siempre, incluso para una ODE escalar (`shape
 (1,)`): tipar `float` documenta un desempaquetado, no un contrato. Ensanchar
 una entrada es gratis — un `float` sigue siendo un `ArrayLike` válido y
-ningún caller se rompe; distinto de ensanchar una *salida*, que sigue
-abierto (campos de `FluidState`/`GradientResult`, ver `CLAUDE.md`). `x`
-queda `float`: es la coordenada del integrador, siempre escalar. Costo
-declarado en docstring: las implementaciones deben ser array-safe; en v0.2
-se documenta, no se testea.
+ningún caller se rompe; el ensanchado de *salida* corría la misma lógica y
+**ya se cerró** (`CLAUDE.md` #5, 2026-08-13): campos de `FluidState` pasan a
+`ArrayLike` (`GradientResult` nunca fue `float`, ver ahí). `x` queda
+`float`: es la coordenada del integrador, siempre escalar. Costo declarado
+en docstring: las implementaciones deben ser array-safe; en v0.2 se
+documenta, no se testea.
 
 **`State.as_physics_kwargs() -> dict[str, ArrayLike]`** *(corrección
 2026-08-13)*. Su consumidor es `gradient_fn`, que ya acepta `ArrayLike` (ver
 `friction_factor(re: ArrayLike, ...)`); tiparlo `float` angosta contra un
 consumidor que no lo pide, y la firma de salida de esta frontera debe
-coincidir con la de entrada de `physics/`. No reabre la decisión abierta
-sobre los campos almacenados de `FluidState`/`GradientResult` (siguen
-`float` en v0.2): un `float` es un `ArrayLike`, así que la firma del método
-puede ser ancha sin tocar los campos. Son dos decisiones distintas.
+coincidir con la de entrada de `physics/`. En su momento esto no reabría la
+decisión sobre los campos almacenados de `FluidState`/`GradientResult` —
+eran dos decisiones distintas; la segunda ya se cerró (ver el párrafo
+anterior).
+
+**`StateModel`/`BoundStateModel` genéricos sobre el `State` concreto**
+*(2026-08-13, renombre `BoundState` → `BoundStateModel` incluido)*. Sin
+parámetro de tipo, toda implementación concreta de `bind` tenía que
+devolver el `BoundStateModel` desnudo, cuyo `__call__` tipa `-> State` — el
+`Protocol` neutro de dos métodos (`as_physics_kwargs()` nomás). El tipo
+concreto (`SinglePhaseFluidState.density`, etc.) se perdía en el camino:
+`fluid.bind()(x=..., across=...).density` no tipaba, aunque en runtime el
+objeto devuelto siempre fue el concreto. Con un `TypeVar` covariante ligado
+a `State`, `StateModel[S]`/`BoundStateModel[S]` propagan `S` a través de
+toda la cadena `bind → BoundStateModel → State`; una implementación
+concreta anota `bind(...) -> BoundStateModel[SinglePhaseFluidState]` y el
+tipo de campo sobrevive hasta el call site. `StateModel`/`BoundStateModel`
+en sí mismos siguen neutros — el parámetro de tipo no ata nada a fluidos,
+solo lo transporta.
 
 Protocolo resultante:
 
 ```python
-class StateModel(Protocol):
-    def bind(self, **fields: object) -> BoundState: ...
+from typing import Protocol, TypeVar
 
-class BoundState(Protocol):
-    def __call__(self, *, x: float, across: ArrayLike) -> State: ...
+S_co = TypeVar("S_co", bound="State", covariant=True)
+
+class StateModel(Protocol[S_co]):
+    def bind(self, **fields: object) -> BoundStateModel[S_co]: ...
+
+class BoundStateModel(Protocol[S_co]):
+    def __call__(self, *, x: float, across: ArrayLike) -> S_co: ...
 
 class State(Protocol):
     def as_physics_kwargs(self) -> dict[str, ArrayLike]: ...

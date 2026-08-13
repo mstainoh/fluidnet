@@ -187,9 +187,21 @@ Rate ──► composición (intensiva)
     `LossFunc`, que *es* la constitutiva).
 
     ```
-    StateModel.bind(**fields: object) -> BoundState             # 1× por eje
-    BoundState.__call__(*, x, across) -> State                  # 1× por paso
+    StateModel.bind(**fields: object) -> BoundStateModel        # 1× por eje
+    BoundStateModel.__call__(*, x, across) -> State              # 1× por paso
     ```
+
+    - **`BoundState` renombrado a `BoundStateModel` (2026-08-13)**: más
+      entendible (queda claro que es el objeto ligado del `StateModel`, no
+      un estado en sí). De paso, `StateModel`/`BoundStateModel` pasan a ser
+      genéricos sobre el `State` concreto (`TypeVar` covariante): sin esto,
+      todo `bind()` concreto devolvía el `BoundStateModel` desnudo, cuyo
+      `__call__` tipa `-> State` (el `Protocol` neutro), y el tipo concreto
+      se perdía — `fluid.bind()(x=..., across=...).density` no tipaba pese a
+      que en runtime siempre fue el objeto concreto. Una implementación
+      anota `bind(...) -> BoundStateModel[SinglePhaseFluidState]` y el campo
+      sobrevive toda la cadena. Ver `docs/design/architecture-v0.2.md` §2.1bis
+      para el protocolo completo con el `TypeVar`.
 
     - **`composition` sale del `Protocol` (corrección 2026-08-13).** No todo
       `StateModel` tiene composición — un modelo de agua dulce se parametriza
@@ -314,7 +326,7 @@ Rate ──► composición (intensiva)
     **Corolario de secuencia: `@diagnostic` ya no bloquea `darcy_weisbach`.**
     Se escribe hoy sin ninguna conciencia de diagnóstico y el mecanismo se
     le suma en v0.5 sin tocarle el cuerpo.
-26. **Dos clases hermanas de `BoundState`, discriminadas en `bind` por
+26. **Dos clases hermanas de `BoundStateModel`, discriminadas en `bind` por
     `callable(field)`.** El corte no es "campo fijo vs. variable" sino **si el
     objeto ligado necesita `x`**: `None` y un escalar son el mismo caso (`x` se
     descarta); un callable es el otro. La rama se decide una vez, fuera del
@@ -338,7 +350,7 @@ Rate ──► composición (intensiva)
     misma evidencia en contra del diferencial physics-agnostic que motivó el
     nombre neutro. Hacia abajo, `pressure` ya está en `physics/`, es el
     vocabulario del dominio, y renombrarlo tocaría capa cero testeada.
-    Traducción en el `__call__` del `BoundState`, una línea.
+    Traducción en el `__call__` del `BoundStateModel`, una línea.
     - **`across: ArrayLike`, no `float` (corrección 2026-08-13).** `solve_ivp`
       pasa `y` como `ndarray` siempre, incluso para una ODE escalar (`shape
       (1,)`): tipar `float` documenta un desempaquetado, no un contrato.
@@ -359,8 +371,8 @@ Rate ──► composición (intensiva)
       firma de método y otra de tipo de campo almacenado. La segunda ya se
       cerró (#5, 2026-08-13: `FluidState` pasa a `ArrayLike`;
       `GradientResult` siempre lo fue).
-    Firmas: `StateModel.bind(**fields: object) -> BoundState`;
-    `BoundState.__call__(*, x: float, across: ArrayLike) -> State`;
+    Firmas: `StateModel[S].bind(**fields: object) -> BoundStateModel[S]`;
+    `BoundStateModel[S].__call__(*, x: float, across: ArrayLike) -> S`;
     `State.as_physics_kwargs() -> dict[str, ArrayLike]`;
     `Fluid.bind(*, composition, temperature=None)`;
     `Fluid.get_state(*, composition, temperature, pressure)`.

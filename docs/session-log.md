@@ -25,6 +25,58 @@
 
 ---
 
+## 2026-08-13 — código: `BoundStateModel` genérico (fix `state.density` no tipaba)
+
+> El usuario renombró `BoundState` → `BoundStateModel` a mano en
+> `state/protocol.py` y estaba armando en paralelo
+> `tests/state/test_gas.py` (ver entrada de abajo, escrita por esa sesión
+> paralela). Reportó mypy en rojo: `state` no tenía `.density` donde debería.
+
+**Cerrado:**
+
+- **Import roto en `state/__init__.py`**: seguía con `from .protocol import
+  BoundState, ...` tras el rename — `ImportError` en cualquier `import
+  fluidnet.state.fluids` (bloqueaba `pytest` entero, no solo mypy).
+  Corregido a `BoundStateModel`.
+- **Causa real del "`state` no tiene `density`": `BoundStateModel`/
+  `StateModel` no eran genéricos.** Todo `bind()` concreto devolvía el
+  `BoundStateModel` desnudo; su `__call__` tipaba `-> State` (el `Protocol`
+  neutro, solo `as_physics_kwargs()`). El tipo concreto se perdía en el
+  camino aunque en runtime el objeto devuelto siempre fue
+  `SinglePhaseFluidState` — reproducido con
+  `python -m mypy tests/state/test_gas.py`: 7 errores
+  `"State" has no attribute "density"/"viscosity"/"compressibility"`
+  (`python -m mypy` sin argumentos no lo mostraba: por config
+  `[tool.mypy] packages = ["fluidnet"]` no cubre `tests/`).
+  Fix: `StateModel`/`BoundStateModel` pasan a `Protocol[S_co]` con
+  `TypeVar("S_co", bound="State", covariant=True)`; `IncompressibleFluid.bind`
+  y `CompressibleFluid.bind` anotan `-> BoundStateModel[SinglePhaseFluidState]`.
+  Los 7 errores desaparecen sin tocar el cuerpo de ningún `bind`/`bound` —
+  es un fix puramente de tipos.
+- Docs actualizadas con el rename + la parametrización genérica:
+  `CLAUDE.md` (#18, #26, #30), `ROADMAP.md` ("Capa 0 bis" y "Cerradas"),
+  `docs/design/architecture-v0.2.md` §2.1bis (protocolo completo con el
+  `TypeVar`). De paso, ese mismo ADR tenía el mismo desfasaje `float`/
+  `ArrayLike` para `FluidState`/`GradientResult` que ya se había corregido
+  en `CLAUDE.md`/ROADMAP/`physics-single-multiphase.md` en la sesión
+  anterior — corregido ahí también.
+- `python -m mypy` limpio (14 archivos) y `python -m mypy tests/state/
+  test_gas.py tests/state/test_single_phase_fluids.py` limpio (2 archivos,
+  0 errores — antes 7). `ruff check`/`format` limpios. `pytest tests/`
+  verde.
+
+**Abierto:**
+
+- Sin cambios respecto de la entrada de abajo (`RealGas`/`IdealGas`):
+  `RealGas.compressibility` sin verificar con `dZ/dP != 0` real,
+  `Rate`/`ScalarRate` pendiente.
+
+**Próximo paso:**
+
+- Sin cambios respecto de la entrada de abajo.
+
+---
+
 ## 2026-08-13 — código: test de `RealGas`/`IdealGas` (metano) + fix `RealGas.density` sin `molar_weight`
 
 > Continuación directa de la sesión anterior del mismo día (`CompressibleFluid`

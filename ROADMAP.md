@@ -162,11 +162,11 @@ Hermana de `physics/`, mismo contrato de capa cero: función pura, SI, sin
 conocer nada de arriba. **Fábrica stateless de `FluidState`.**
 
 ```
-StateModel.bind(**fields: object) -> BoundState             # 1× por eje
-BoundState.__call__(*, x: float, across: ArrayLike) -> State # 1× por evaluación
+StateModel[S].bind(**fields: object) -> BoundStateModel[S]        # 1× por eje
+BoundStateModel[S].__call__(*, x: float, across: ArrayLike) -> S  # 1× por evaluación
 State.as_physics_kwargs() -> dict[str, ArrayLike]
 
-Fluid.bind(*, composition, temperature=None) -> BoundState
+Fluid.bind(*, composition, temperature=None) -> BoundStateModel[SinglePhaseFluidState]
 FluidState: SinglePhaseFluidState | MultiPhaseFluidState  (NamedTuple + as_physics_kwargs)
 ```
 
@@ -510,6 +510,22 @@ circuitos cerrados: hidráulica de edificios, procesos con recirculación.
   `dict[str, ArrayLike]` — pasa por compatibilidad con `Any` sin que mypy
   lo verifique; no se corrigió (construir el dict a mano cuesta repetir los
   tres nombres, no vale la pena todavía).
+- **`BoundState` renombrado a `BoundStateModel`, genérico sobre el `State`
+  concreto (2026-08-13).** El nombre viejo confundía "objeto ligado del
+  `StateModel`" con "un estado". El motivo real del cambio es de tipos, no
+  solo de nombre: sin parámetro genérico, todo `bind()` concreto devolvía
+  el `BoundStateModel` desnudo, cuyo `__call__` tipa `-> State` (el
+  `Protocol` neutro, solo `as_physics_kwargs()`) — `fluid.bind()(x=...,
+  across=...).density` no tipaba en mypy pese a que el objeto devuelto en
+  runtime siempre fue `SinglePhaseFluidState`. `StateModel`/
+  `BoundStateModel` pasan a `Protocol[S_co]` con un `TypeVar` covariante
+  ligado a `State`; una implementación concreta anota
+  `bind(...) -> BoundStateModel[SinglePhaseFluidState]` y el tipo de campo
+  sobrevive la cadena completa. Ver `CLAUDE.md` #18 y
+  `docs/design/architecture-v0.2.md` §2.1bis para el protocolo con el
+  `TypeVar`. `state/__init__.py` tenía el import viejo (`BoundState`) sin
+  actualizar tras el rename — eso rompía el import de todo
+  `fluidnet.state.fluids`, corregido en la misma pasada.
 
 ### Abiertas
 
