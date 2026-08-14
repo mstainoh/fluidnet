@@ -618,3 +618,11 @@ circuitos cerrados: hidráulica de edificios, procesos con recirculación.
   matemático, no computacional. v0.2 = 1 nivel; v1.0 forward + `IntegralLoss`
   = 2; 3 sólo en `mass_balance` + `IntegralLoss` + BC que exijan inversión.
   El peor caso no está en el camino a JOSS.
+- **Validación de firma del `viscosity_fn` por `inspect.signature` en
+  `__init__`** (verificar que los kw-only sin default sean subconjunto de
+  los inyectables, `CLAUDE.md` #31). Costo cero en runtime, mejora de DX.
+  Requiere decidir antes qué significa un `**kwargs` de catch-all en la
+  firma. No bloquea v0.2. *(2026-08-14)*
+- **Herning-Zipperer como mixing rule de viscosidad** (`μ_mix` desde `μᵢ`
+  por componente) — gancho natural cuando la propagación de composición
+  llegue a la capa de transporte (v1.5). *(2026-08-14)*

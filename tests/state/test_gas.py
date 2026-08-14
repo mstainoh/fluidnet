@@ -16,8 +16,8 @@ METHANE_DENSITY_STP = 0.717  # kg/m3, literature value at 0 degC / 1 atm
 class TestIdealGasMethane:
     def _fluid(self) -> IdealGas:
         return IdealGas(
-            molar_weight=METHANE_MOLAR_WEIGHT,
-            viscosity=lambda pressure, temperature: METHANE_VISCOSITY,
+            molecular_weight=METHANE_MOLAR_WEIGHT,
+            viscosity_fn=lambda pressure, temperature, **injectables: METHANE_VISCOSITY,
         )
 
     def test_density_matches_methane_at_standard_conditions(self) -> None:
@@ -45,16 +45,16 @@ class TestRealGasMatchesIdealGasWhenZIsOne:
 
     def _ideal(self) -> IdealGas:
         return IdealGas(
-            molar_weight=METHANE_MOLAR_WEIGHT,
-            viscosity=lambda pressure, temperature: METHANE_VISCOSITY,
+            molecular_weight=METHANE_MOLAR_WEIGHT,
+            viscosity_fn=lambda pressure, temperature, **injectables: METHANE_VISCOSITY,
         )
 
     def _real(self) -> RealGas:
         return RealGas(
-            molar_weight=METHANE_MOLAR_WEIGHT,
+            molecular_weight=METHANE_MOLAR_WEIGHT,
             z_fn=lambda pressure, temperature: 1.0,
             dz_fn=lambda pressure, temperature: 0.0,
-            viscosity_fn=lambda pressure, temperature: METHANE_VISCOSITY,
+            viscosity_fn=lambda pressure, temperature, **injectables: METHANE_VISCOSITY,
         )
 
     def test_density_matches_methane_at_standard_conditions(self) -> None:

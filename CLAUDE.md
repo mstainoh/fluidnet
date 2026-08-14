@@ -376,6 +376,44 @@ Rate ──► composición (intensiva)
     `State.as_physics_kwargs() -> dict[str, ArrayLike]`;
     `Fluid.bind(*, composition, temperature=None)`;
     `Fluid.get_state(*, composition, temperature, pressure)`.
+31. **Inyección de propiedades en correlaciones de viscosidad (2026-08-14).**
+    El callable de viscosidad recibe `(pressure, temperature,
+    **injectables)`. La clase `Fluid` inyecta lo que ya calculó o conoce:
+    `density`, `molecular_weight`, y `pressure_reduced`/
+    `temperature_reduced` si `uses_reduced_properties`. Lo que es privado del
+    modelo de viscosidad (`mu_ref`, `S`, …) se fija con `functools.partial`.
+    Razón: evita doble fuente de verdad para `molecular_weight` y elimina el
+    fallback a densidad ideal que había en `RealGas`. Corolario de #5/#10:
+    las correlaciones no pueden defaultear parámetros físicos (`density`,
+    `molecular_weight`, reducidas) — kw-only sin default, para que un typo en
+    el nombre inyectado falle con `TypeError` en vez de usar un default
+    silencioso. `**kwargs` de catch-all sí es válido, para ignorar
+    injectables no usados.
+    **Mecanismo único en `CompressibleFluid`, no por subclase (misma
+    sesión, corrección).** El alcance inicial del cambio fue solo
+    `RealGas`; la asimetría con `IdealGas` no era una decisión, era que el
+    pedido acotó el alcance. `_viscosity_injectables`/`viscosity()` subieron
+    a `CompressibleFluid` (`state/fluids/single_phase_fluids.py`) — un EOS
+    ideal no implica una correlación de viscosidad `T`-only: `mu = f(T)`
+    (Sutherland) es propiedad de la correlación elegida, no de la clase;
+    `IdealGas` + LGE (density-dependent) es una combinación válida y usa la
+    densidad ideal correctamente. `uses_reduced_properties` (default
+    `False`) y el hook `_reduced_injectables` (default `{}`) son lo único
+    que una subclase overridea — `RealGas` los override, `IdealGas` no.
+    **Rename `molar_weight` → `molecular_weight`** en `IdealGas`/`RealGas`
+    (constructor y atributo): eran el mismo dato con dos nombres — el
+    injectable ya se llamaba `molecular_weight` (también el nombre usado
+    en `physics/gas_correlations/viscosity.py`), y mantener `molar_weight`
+    en el constructor era la tabla de renombres que #21 (vocabulario
+    canónico) prohíbe. **Bug de paso, `RealGas.compressibility`**: `dz_fn`
+    se llamaba con `(pressure, temperature)` absolutos aun cuando `z_fn` se
+    evaluaba en reducidas (`Pc`/`Tc` dados) — inconsistencia entre el par
+    `z_fn`/`dz_fn` de la misma correlación. Corregido con un helper
+    `_reduced_pt` compartido por `z()` y `compressibility()`: mismos inputs
+    para ambos. La convención de salida de `dz_fn` no cambia (`dZ/dP`
+    respecto de presión *absoluta*, `1/Pa`) — si la correlación es
+    analítica en reducidas, el factor de cadena `1/Pc` es responsabilidad
+    de quien escribe `dz_fn`, no de `RealGas`.
 
 ## Convenciones de testing (capa physics)
 

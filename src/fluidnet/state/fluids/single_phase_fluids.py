@@ -65,7 +65,7 @@ class CompressibleFluid(ABC):
 
     Composition is bound as early as the case allows. A fluid whose EOS
     parameters are fixed for the network resolves them in ``__init__``
-    (e.g. ``IdealGas(molar_weight=...)``) and its ``bind`` takes no
+    (e.g. ``IdealGas(molecular_weight=...)``) and its ``bind`` takes no
     composition at all. A compositional fluid (v1.5, composition comes from
     ``propagate_rates`` at runtime) overrides ``bind`` to accept it and
     resolves the EOS parameters once there, before returning the closure.
@@ -78,7 +78,20 @@ class CompressibleFluid(ABC):
     once in ``bind`` by ``callable(temperature)`` — no intermediate wrapper
     type. A callable is re-evaluated at ``x`` on every step (prescribed
     profile); ``None``/a scalar is captured once and ``x`` is ignored.
+
+    ``viscosity`` is concrete here, not abstract (#21): every subclass
+    delegates to a constructor-supplied ``viscosity_fn(pressure,
+    temperature, **injectables) -> mu`` correlation, and the property
+    injection (``density``, ``molecular_weight``, and any reduced
+    properties) is identical machinery regardless of the EOS. A subclass
+    sets ``self.molecular_weight``/``self.viscosity_fn`` in its
+    ``__init__`` and overrides :meth:`_reduced_injectables` (and
+    :attr:`uses_reduced_properties`) only if it has reduced properties to
+    offer — ``RealGas`` does, ``IdealGas`` doesn't.
     """
+
+    molecular_weight: float
+    viscosity_fn: Callable[..., ArrayLike]
 
     @abstractmethod
     def density(self, *, pressure: ArrayLike, temperature: float | None = None) -> ArrayLike:
@@ -92,10 +105,97 @@ class CompressibleFluid(ABC):
         """Return isothermal compressibility at given P, T (EOS)."""
         ...
 
-    @abstractmethod
+    @property
+    def uses_reduced_properties(self) -> bool:
+        """bool: Whether this EOS's correlations are evaluated at reduced
+        properties (``P/Pc``, ``T/Tc``) rather than absolute ``(P, T)``.
+        ``False`` unless a subclass that has pseudo-critical properties
+        overrides it (e.g. ``RealGas`` when both ``Pc`` and ``Tc`` are
+        given).
+        """
+        return False
+
+    def _reduced_injectables(
+        self, *, pressure: ArrayLike, temperature: float
+    ) -> dict[str, ArrayLike]:
+        """Reduced-property injectables for ``viscosity_fn`` (#21).
+
+        Hook for subclasses that support reduced properties. Empty by
+        default — a subclass overrides it together with
+        :attr:`uses_reduced_properties`.
+
+        Parameters
+        ----------
+        pressure : ArrayLike
+            Pressure [Pa].
+        temperature : float
+            Temperature [K].
+
+        Returns
+        -------
+        dict[str, ArrayLike]
+            Empty unless overridden.
+        """
+        return {}
+
+    def _viscosity_injectables(
+        self, *, pressure: ArrayLike, temperature: float
+    ) -> dict[str, ArrayLike]:
+        """Properties this class already knows or has computed, offered to
+        ``viscosity_fn`` by keyword (``CLAUDE.md`` #21).
+
+        Parameters
+        ----------
+        pressure : ArrayLike
+            Pressure [Pa].
+        temperature : float
+            Temperature [K].
+
+        Returns
+        -------
+        dict[str, ArrayLike]
+            ``density`` and ``molecular_weight`` always, plus whatever
+            :meth:`_reduced_injectables` adds (e.g. ``pressure_reduced``,
+            ``temperature_reduced`` when :attr:`uses_reduced_properties`).
+        """
+        injectables: dict[str, ArrayLike] = {
+            "density": self.density(pressure=pressure, temperature=temperature),
+            "molecular_weight": self.molecular_weight,
+        }
+        injectables.update(self._reduced_injectables(pressure=pressure, temperature=temperature))
+        return injectables
+
     def viscosity(self, *, pressure: ArrayLike, temperature: float | None = None) -> ArrayLike:
-        """Return viscosity at given P, T (EOS)."""
-        ...
+        """Viscosity, delegated to the constructor's ``viscosity_fn``
+        correlation (#21).
+
+        An ideal EOS does not imply a temperature-only viscosity model:
+        ``mu = f(T)`` (e.g. Sutherland) holds in the dilute-gas limit,
+        which is a property of the chosen correlation, not of the EOS.
+        ``IdealGas`` paired with a density-dependent correlation (e.g.
+        Lee-Gonzalez-Eakin) is a valid, correct combination — ``density``
+        here is still the ideal-gas density from :meth:`density`.
+
+        Parameters
+        ----------
+        pressure : ArrayLike
+            Pressure [Pa].
+        temperature : float, optional
+            Temperature [K]. Required — ``None`` raises ``ValueError``.
+
+        Returns
+        -------
+        ArrayLike
+            Dynamic viscosity [Pa.s], from ``viscosity_fn(pressure,
+            temperature, **injectables)`` — see
+            :meth:`_viscosity_injectables` for what is injected.
+        """
+        if temperature is None:
+            raise ValueError(
+                f"Temperature must be provided for {type(self).__name__} viscosity calculation."
+            )
+        injectables = self._viscosity_injectables(pressure=pressure, temperature=temperature)
+        return self.viscosity_fn(pressure, temperature, **injectables)
 
     def _state_at(self, *, pressure: ArrayLike, temperature: float | None) -> SinglePhaseFluidState:
         return SinglePhaseFluidState(
