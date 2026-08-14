@@ -21,9 +21,9 @@ def test_hall_yarborough_vectorized_matches_scalar_loop() -> None:
     Tpr = np.array([1.3, 1.5, 1.8, 2.0, 2.5])
 
     vectorized = z_hall_yarborough(Ppr, Tpr)
-    looped = np.array([z_hall_yarborough(p, t) for p, t in zip(Ppr, Tpr)])
+    looped = np.array([z_hall_yarborough(p, t) for p, t in zip(Ppr, Tpr, strict=True)])
 
-    assert vectorized.shape == Ppr.shape
+    assert np.asarray(vectorized).shape == Ppr.shape
     np.testing.assert_allclose(vectorized, looped, rtol=1e-6)
 
 
@@ -32,9 +32,9 @@ def test_dranchuk_abou_kassem_vectorized_matches_scalar_loop() -> None:
     Tpr = np.array([1.3, 1.5, 1.8, 2.0, 2.5])
 
     vectorized = z_dranchuk_abou_kassem(Ppr, Tpr)
-    looped = np.array([z_dranchuk_abou_kassem(p, t) for p, t in zip(Ppr, Tpr)])
+    looped = np.array([z_dranchuk_abou_kassem(p, t) for p, t in zip(Ppr, Tpr, strict=True)])
 
-    assert vectorized.shape == Ppr.shape
+    assert np.asarray(vectorized).shape == Ppr.shape
     np.testing.assert_allclose(vectorized, looped, rtol=1e-6)
 
 

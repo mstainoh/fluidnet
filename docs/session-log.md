@@ -25,6 +25,76 @@
 
 ---
 
+## 2026-08-14 — código: golden Z-factor vs. Standing-Katz (Kamyab et al. 2010) + `RealGas.z()` bonus
+
+> Continuación directa de la entrada de abajo (mismo día): cierra el ítem
+> abierto "golden dataset real pendiente". El usuario dio el dataset
+> completo (`GOLDEN_Z_STANDING_KATZ`, 36 puntos Tpr/Ppr/Z) con instrucciones
+> mecánicas explícitas: crear el golden test siguiendo el patrón de
+> `tests/test_multiphase_golden.py` — archivo que ya no existe con ese
+> nombre (`git log` confirma el rename a `tests/physics/
+> test_beggs_brill_vs_book.py` en el commit `a346df1`, 2026-08-07); se usó
+> ese archivo actual como referencia de patrón. Instrucción explícita de
+> parar sin inventar si `RealGas`/`StateModel` no expone `Z` como output de
+> `bind()`/`__call__` — se paró, se reportó el estado real (ver hallazgo
+> abajo), y el usuario redirigió el alcance: golden solo contra la capa
+> `physics` (opción 1), más un test aparte en `state/` para `RealGas.z()`.
+
+**Cerrado:**
+
+- **Hallazgo reportado antes de escribir nada** (`CLAUDE.md` no tiene
+  cerrado un campo `Z`/`compressibility_factor` en `FluidState`):
+  `SinglePhaseFluidState` (#19/#21) solo tiene `density`/`viscosity`/
+  `compressibility` — `Z` no es accesible vía `bind()`/`__call__`.
+  `RealGas.z(*, pressure, temperature)` sí existe como método público
+  directo (no vía `StateModel`), llama a `z_fn` en reducidas si hay
+  `Pc`/`Tc`. No se inventó un wrapper para forzar `Z` al protocolo — el
+  usuario decidió el alcance en base a este reporte.
+- **`tests/physics/test_z_factor_vs_book.py`** (nuevo): golden real, capa
+  `physics` pura (`z_hall_yarborough`/`z_dranchuk_abou_kassem`
+  directamente, sin `RealGas`/`StateModel`), parametrizado sobre las 36
+  filas de `GOLDEN_Z_STANDING_KATZ` (dataset + cita bibliográfica completa
+  en el docstring del módulo, tal cual lo dio el usuario — Kamyab et al.
+  2010, JPSE, digitalización del chart Standing-Katz 1942), `rtol=3e-2`
+  (error de digitalización/interpolación del dataset fuente, no del
+  modelo).
+- **Región cercana al crítico (`Tpr` 1.05/1.10): 12 de 72 casos en rojo la
+  primera corrida.** Patrón consistente, no ruido: las dos filas de `Tpr`
+  más bajas del dataset, ambas `> 1.0` (dentro del dominio nominal
+  declarado por las dos correlaciones — no es un caso fuera de rango
+  colándose). Dos sub-tipos de falla: fuera de `rtol=3e-2` (la mayoría), y
+  2 casos de Dranchuk-Abou-Kassem donde `scipy.optimize.newton` (secante)
+  no converge en 50 iteraciones (`RuntimeError`) porque la raíz real
+  (`Z≈0.68-0.95`) queda lejos del guess inicial `Z0=1.0` en esa zona no
+  lineal. Confirmado con el usuario que ningún caso que falla tiene
+  `Tpr <= 1.0` antes de proceder. Los 12 casos (sets distintos entre HY y
+  DAK) quedan `xfail(strict=True)` con motivo documentado en el módulo —
+  mismo patrón que otros `xfail` del repo, spec ejecutable de una
+  limitación conocida de literatura (ninguna correlación fue ajustada para
+  resolver la forma no monótona de la isoterma cerca del crítico al 3%).
+  **60 pasan, 12 xfail.**
+- **Bonus, `tests/state/test_gas.py`**: nueva clase
+  `TestRealGasZWhenZIsNotOne` (hermana de
+  `TestRealGasMatchesIdealGasWhenZIsOne`), dos tests separados (uno por
+  correlación) que confirman `RealGas.z()` es pass-through exacto a
+  `z_hall_yarborough`/`z_dranchuk_abou_kassem` en `(Ppr, Tpr)` reducidas
+  (metano, `Pc=4.599 MPa`, `Tc=190.6 K`, lejos de la zona conflictiva de
+  arriba). Test independiente del golden — verifica el wrapper de
+  `RealGas`, no la precisión de la correlación.
+- `pytest` verde (72 passed/xfailed en total sumando ambos archivos
+  nuevos + el resto de la suite), `python -m mypy` limpio.
+
+**Abierto:**
+
+- Sin cambios respecto de la entrada de abajo (el resto del roadmap de
+  gas compresible sigue igual).
+
+**Próximo paso:**
+
+- Sin instrucciones nuevas del usuario todavía.
+
+---
+
 ## 2026-08-14 — código: refactor Z-factor (`gas_correlations/z_factor.py`) + vectorización
 
 > Continuación de la sesión de viscosidad de gas (ver entrada de abajo, mismo
