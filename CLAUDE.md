@@ -427,8 +427,17 @@ Rate ──► composición (intensiva)
 - `xfail(strict=True)` se usa como **spec ejecutable de roadmap** (p. ej.
   vectorización de `_beggs_brill_detailed` para v0.5) — no lo borres para
   "arreglar" un test rojo; es rojo a propósito hasta que se implemente.
-- Golden tests: preferir literatura (Kermit Brown ej. 4.7) sobre valores
-  pinneados de `fluids` cuando ambos estén disponibles.
+- Golden tests: preferir literatura (Kermit Brown ej. 4.7; Ahmed,
+  *Reservoir Engineering Handbook*, ej. 2-14 para viscosidad LGE) sobre
+  valores pinneados de `fluids` cuando ambos estén disponibles.
+  `tests/physics/test_gas_viscosity_vs_book.py` sigue el mismo patrón que
+  `test_beggs_brill_vs_book.py`: expone un `_lee_gonzalez_eakin_detailed`
+  (intermedios `K`/`X`/`Y`) hermano de `lee_gonzalez_eakin_viscosity`,
+  mismo mecanismo que `_beggs_brill_detailed` (#25) pero a nivel de
+  correlación de viscosidad, no de gradiente. El caso del libro fue el que
+  detectó un bug real: faltaba el prefactor `1e-4` de la Ec. 2-63
+  (`mu[cP] = 1e-4 * K * exp(X * rho^Y)`) — sin él, el resultado daba 4
+  órdenes de magnitud de más.
 - **Tests de comportamiento vectorial** (`test_flowmap_vectorized`,
   `test_detailed_scalar_contract_today`, `test_detailed_vectorized_over_rates`
   xfail) viven en `tests/physics/test_multiphase_vector_1.py`, archivo

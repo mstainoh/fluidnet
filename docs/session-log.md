@@ -25,6 +25,80 @@
 
 ---
 
+## 2026-08-14 — código: inyección de propiedades en viscosidad de gas + fix `1e-4` en LGE
+
+> Continuación de la sesión de `RealGas`/`IdealGas` (ver más abajo). Pedido
+> inicial: actualizar la firma de `RealGas.viscosity` para que el callable
+> reciba `(pressure, temperature, **injectables)` en vez de solo
+> `(pressure, temperature)` (`CLAUDE.md` #21, nuevo). Al revisar el alcance
+> el usuario pidió subir el mecanismo a `IdealGas` también (no era una
+> decisión de excluirlo, era el alcance acotado del pedido original), y de
+> paso surgieron dos bugs preexistentes.
+
+**Cerrado:**
+
+- **`CLAUDE.md` #21**: `viscosity_fn(pressure, temperature, **injectables)`.
+  `CompressibleFluid` inyecta `density`, `molecular_weight`, y
+  `pressure_reduced`/`temperature_reduced` si `uses_reduced_properties`.
+  Kw-only sin default en la correlación para esos nombres — un typo falla
+  con `TypeError`, no con un default silencioso. `**kwargs` catch-all
+  válido para ignorar injectables no usados.
+- **Mecanismo único en `CompressibleFluid`** (`state/fluids/
+  single_phase_fluids.py`), no duplicado por subclase: `viscosity()` pasa
+  de abstracto a concreto ahí; `uses_reduced_properties` (default `False`)
+  y el hook `_reduced_injectables` (default `{}`) son lo único que
+  `RealGas` overridea e `IdealGas` no. Nota física agregada al docstring:
+  un EOS ideal no implica una correlación de viscosidad `T`-only —
+  `IdealGas` + LGE (density-dependent) es combinación válida.
+- **Bug real en `IdealGas`/`RealGas`, dos:** `IdealGas.viscosity` llamaba a
+  `self._viscosity_fn`, atributo que no existía (el constructor guardaba
+  `self._viscosity_fn` pero el nombre correcto tras el cambio es
+  `viscosity_fn`); `RealGas._viscosity_injectables` usaba `self.Pr`/
+  `self.Tr`, que tampoco existían (correcto: `self.Pc`/`self.Tc`). Ambos
+  tiraban `AttributeError` en cualquier llamada a `.viscosity()`.
+- **Bug real, `RealGas.compressibility`:** `dz_fn` se llamaba con
+  `(pressure, temperature)` absolutos aun cuando `z_fn` se evaluaba en
+  reducidas (`Pc`/`Tc` dados) — el par `z_fn`/`dz_fn` de la misma
+  correlación veía convenciones de coordenadas distintas. Fix: helper
+  `_reduced_pt` compartido por `z()` y `compressibility()`.
+- **Rename `molar_weight` → `molecular_weight`** en `IdealGas`/`RealGas`
+  (constructor + atributo): el injectable ya se llamaba `molecular_weight`
+  (y también las correlaciones reales en `physics/gas_correlations/
+  viscosity.py`) — mantener `molar_weight` en el constructor era la tabla
+  de renombres que #29 prohíbe.
+- **Bug real en `lee_gonzalez_eakin_viscosity`** (`physics/
+  gas_correlations/viscosity.py`): faltaba el prefactor `1e-4` de la Ec.
+  2-63 de Ahmed (`mu[cP] = 1e-4 * K * exp(X * rho^Y)`) — sin él el
+  resultado quedaba 4 órdenes de magnitud de más. Encontrado al armar el
+  golden test contra Ahmed, *Reservoir Engineering Handbook*, Example
+  2-14 (verificado también fuera de sesión por el usuario). Se expuso
+  `_lee_gonzalez_eakin_detailed` (K/X/Y + viscosity), mismo patrón que
+  `_beggs_brill_detailed` (#25), y `lee_gonzalez_eakin_viscosity` pasa a
+  ser un wrapper de una línea sobre ese dict.
+  Golden test: `tests/physics/test_gas_viscosity_vs_book.py`
+  (`rtol=1e-2` — el libro reporta rho e intermedios ya redondeados;
+  K=119.72, X=5.35, Y=1.33, mu=0.0173 cP, todos verificados).
+- `pytest` verde (65 tests), `python -m mypy` limpio (17 archivos).
+
+**Abierto:**
+
+- **Invariante de signo `∂μ/∂T` cruzando ~7 MPa** (GPSA/PetroSkills Fig.
+  23-23), propuesto como test estructural adicional para LGE — descartado
+  por ahora: requiere densidad de gas real (`Z < 1` en ese rango), y el
+  repo no tiene un Z-factor implementado todavía (`physics/
+  gas_correlations/z_factor.py` es un placeholder vacío). Con densidad
+  ideal (`Z=1`) el cruce de signo existe pero aparece ~17-18 MPa, no ~7 —
+  no vale la pena documentar ese número como si fuera el de la fuente. Se
+  retoma cuando exista un Z-factor real en el repo.
+- Sin cambios respecto de las entradas de abajo: `Rate`/`ScalarRate`
+  pendiente.
+
+**Próximo paso:**
+
+- Sin cambios respecto de la entrada de abajo.
+
+---
+
 ## 2026-08-13 — código: `BoundStateModel` genérico (fix `state.density` no tipaba)
 
 > El usuario renombró `BoundState` → `BoundStateModel` a mano en
