@@ -55,7 +55,14 @@ argumento estructural para no reordenar v0.5 detrás de nada.
 4. **Core SI estricto.** Unidades de presentación solo en la capa de I/O.
 5. **Commits chicos contra `main` limpia**, en el orden del mapa de rescate
    desde mineplanner.
-
+6. **Todo claim declarado se verifica automáticamente, o se borra.** Si
+   `pyproject.toml` dice que soporta 3.10, hay un job que lo prueba. Si
+   `CLAUDE.md` dibuja capas, hay un contrato que las chequea. Si un docstring
+   promete un rango de validez, hay un test en ese rango. La alternativa no es
+   "confiar": es afirmar sin evidencia, que es exactamente lo que un revisor
+   busca. Corolario operativo: la verificación no puede depender de que el
+   operador se acuerde de correrla.
+  
 ---
 
 ## Dominio objetivo y por qué la secuencia es esta
@@ -320,6 +327,28 @@ impuesta). El grafo sigue siendo un DAG.
 
 **Criterio de salida:** 3 solvers operativos · un caso multifásico documentado ·
 tag `v1.0`.
+
+### Infraestructura de repositorio (sesión de código dedicada)
+
+Bloque que hoy no existe: `dev` no tiene `.github/` en absoluto. Se agrupa
+porque JOSS lo revisa como conjunto y porque el DOI (prioridad temporal) no
+tenía lugar en este documento.
+
+- **CI mínimo** — `.github/workflows/checks.yml`: matriz 3.10/3.12 (los
+  classifiers de `pyproject.toml` declaran soporte que nadie verificó), con
+  `ruff`, `ruff format --check`, `mypy`, `lint-imports` y `pytest` sobre
+  instalación limpia. Adelantable a v0.5 si la deriva entre sesiones vuelve a
+  costar tiempo.
+- **Community guidelines** — `CONTRIBUTING.md` y `.github/ISSUE_TEMPLATE/`:
+  cómo contribuir, cómo reportar problemas, cómo pedir ayuda. Ítem explícito
+  del checklist de revisión de JOSS.
+- **Citabilidad** — `CITATION.cff` + workflow de release por tag + integración
+  Zenodo. Produce el DOI archivado y versionado que fija fecha de prioridad.
+- **Coverage reportado** en CI. Opcional para JOSS, barato una vez que hay
+  workflow.
+
+Riesgo de dejarlo para el final: es la clase de ítem que se descubre tarde y
+empuja la fecha de submit sin aportar nada al diseño.
 
 ---
 

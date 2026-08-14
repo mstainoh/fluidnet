@@ -414,6 +414,24 @@ Rate ──► composición (intensiva)
     respecto de presión *absoluta*, `1/Pa`) — si la correlación es
     analítica en reducidas, el factor de cadena `1/Pc` es responsabilidad
     de quien escribe `dz_fn`, no de `RealGas`.
+32. **Organización de módulos e imports.** Los alias de tipo transversales viven
+    en `fluidnet/_types.py` (capa −1, no importa nada del paquete).
+    `physics/types.py` conserva solo lo específico de física. `physics/` y
+    `state/` son hermanos: ninguno importa del otro; si aparece la tentación de
+    un import lateral, el símbolo va a `_types.py` o el diseño está mal. Los
+    `__init__.py` re-exportan solo si el subpaquete es fachada pública; el
+    código interno y los tests importan del módulo que define.
+    `fluidnet/__init__.py` expone solo `__version__` hasta v1.0. Verificado por
+    `import-linter` (`lint-imports`).
+33. **Abstracto vs. concreto es un eje de profundidad, no de hermandad.** El
+    protocolo vive en `<paquete>/protocol.py`; las implementaciones concretas en
+    subpaquetes por dominio (`state/fluids/`, y a futuro `state/electrical/`). No
+    existe un paquete `protocols/` transversal.
+34. **`StateModel` es el contrato; las ABC son conveniencia.** La librería anota
+    siempre contra el Protocol, nunca contra una clase base concreta.
+    `CompressibleFluidBase` es pública como ayuda para implementadores (regala
+    `viscosity` y `bind`), no como requisito. Herencia opcional, protocolo
+    obligatorio.
 
 ## Convenciones de testing (capa physics)
 
@@ -455,6 +473,15 @@ Rate ──► composición (intensiva)
 3. Commits atómicos, chicos, contra `main` limpia.
 4. Al cerrar la sesión: actualizá `docs/session-log.md` (qué se cerró, qué
    quedó abierto, próximo paso en una frase) antes de terminar.
+
+## 10. ROADMAP.md
+
+- Agregar el principio 6 al final de §Principios que ordenan el plan
+  (texto exacto provisto por el usuario, pegar sin reformular).
+- Agregar el bloque "Infraestructura de repositorio" al final de §v1.0
+  (texto exacto provisto, pegar sin reformular).
+- No reordenar ni reescribir nada más del documento.
+- NO crear `.github/` en esta sesión: es una sesión de código aparte.
 
 ## Dónde está cada cosa
 
