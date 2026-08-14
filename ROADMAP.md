@@ -684,3 +684,16 @@ circuitos cerrados: hidráulica de edificios, procesos con recirculación.
   `__init__` lo bloquea aguas arriba y el DAG mantiene signos consistentes.
   Al habilitar ciclos o convenciones de signo mixtas, convertir el guard en
   `raise`: la condición ya está escrita, es la misma rama. *(2026-08-14)*
+- **Dónde vive la composición en v1.5, con `VectorRateBase` empaquetado y eje
+  de cantidad primero (`CLAUDE.md` #35–#37).** Antes del refactor a array
+  único la pregunta ni se planteaba — la composición era un campo aparte del
+  `Rate`. Con `value` como `(n_cantidades, *shape_escenario)`, tres formas
+  quedan abiertas y no equivalentes: (a) un segundo eje del mismo array
+  (composición como otra "cantidad" empaquetada, mismo mecanismo de
+  broadcasting que #36), (b) un atributo separado del `Rate` (lo que hacía
+  `BrineRate` hasta ahora, `dict[str, ArrayLike]` — ver `CLAUDE.md` #22), o
+  (c) `_combine` con promedio ponderado operando sobre una estructura
+  distinta a `value`. No bloquea v0.2 (`BrineRate` es `ScalarRateBase`, no
+  toca `VectorRateBase`); aparece recién cuando un rate multifásico necesite
+  cargar composición, que es v1.5. Anotado a partir de este refactor de
+  `BaseRate`, no antes. *(2026-08-14)*

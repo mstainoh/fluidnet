@@ -267,8 +267,18 @@ Rate ──► composición (intensiva)
     de entrega: nombre canónico + valor en SI. **`loss_func` compone, no
     traduce**: la aridad multifásica es cómputo (`Rate` da el extensivo,
     `StateModel` la fracción, el producto da los rates por fase).
-    Corolario en `Rate`: el nombre canónico es `ClassVar` de la subclase
-    (#22), nunca argumento de `__init__`.
+
+    **El contrato del `Protocol` `Rate` es `as_physics_kwargs()`, no
+    `physics_key`.** Lo único que el `Protocol` promete — y lo único que
+    `loss_func` consume — es el método; el vocabulario canónico vive en las
+    *claves del dict* que devuelve. `physics_key: str` / `physics_keys:
+    tuple[str, ...]` (#36) son el mecanismo con el que las clases base de
+    conveniencia `ScalarRateBase`/`VectorRateBase` (#35) *implementan* ese
+    método — un `ClassVar` interno de esas clases, no parte del `Protocol`.
+    Esto no es una excepción a "vocabulario canónico, no tabla de
+    renombres": es la misma regla enunciada un nivel más arriba. Una
+    implementación de `Rate` que armara `as_physics_kwargs()` a mano, sin
+    `physics_key` en absoluto, seguiría cumpliendo el contrato igual.
 22. **`Rate` se define por contrato, no por contenido**: *puedo sumarme con
     otros y dar balance cero, y puedo meterme en una loss func.*
     - `as_physics_kwargs()` **sí existe** en `Rate` — lo extensivo va a la
@@ -501,6 +511,41 @@ Rate ──► composición (intensiva)
     `CompressibleFluidBase` es pública como ayuda para implementadores (regala
     `viscosity` y `bind`), no como requisito. Herencia opcional, protocolo
     obligatorio.
+35. **`BaseRate` pasa a ABC; único método abstracto `as_physics_kwargs`.**
+    Hermanos concretos `ScalarRateBase` y `VectorRateBase`, sin herencia
+    entre ellos: `physics_key: str` (escalar) y `physics_keys: tuple[str,
+    ...]` (vector, #36) son tipos incompatibles — forzar un ancestro común
+    entre los dos obligaría a mypy a mentir sobre uno de los dos campos.
+    Coherente con #34 (el `Protocol` es el contrato, las ABC son
+    conveniencia): un implementador que no quiera ninguna de las dos
+    convenciones de `physics_key(s)` puede ignorar `BaseRate` por completo e
+    implementar `as_physics_kwargs()` directo (#21).
+36. **Convención de eje para rates multi-cantidad: eje de cantidad primero.**
+    `VectorRateBase.value` tiene shape `(n_cantidades, *shape_escenario)`,
+    no `(*shape_escenario, n_cantidades)`. Razón: `__mul__` contra una
+    fracción de split de shape `(n_cantidades,)` tiene que broadcastear
+    directo contra `(n_cantidades, *shape_escenario)` — numpy alinea por la
+    derecha, así que con el eje de cantidad al final la fracción
+    broadcastearía contra el eje de escenario en vez del de cantidad.
+    **Complementaria, no contradictoria, con "`StateModel` array-safe
+    elementwise sobre el último eje"** (ADR `architecture-v0.2.md` §2.1bis,
+    cierre 2026-08-13; ROADMAP §Abiertas "Vectorización por escenarios").
+    Son dos arrays distintos con roles de eje distintos: el eje "último" de
+    esa decisión es el eje de **escenario/evaluación** de `across`/`x` en el
+    integrador; el eje "primero" de ésta es el eje de **cantidad** dentro de
+    un único `Rate` multifásico. Leídas sueltas parecen chocar (¿primero o
+    último?); resuelto, cada una fija el extremo opuesto del mismo array
+    `(n_cantidades, *shape_escenario)`: cantidad adelante, escenario atrás,
+    y la ODE opera elementwise sobre ese último eje sin ver el primero.
+37. **Constructor canónico de `VectorRateBase`: un único array empaquetado.**
+    `__init__(value: ArrayLike)` con `value.shape[0] == len(physics_keys)`
+    (#36) es el contrato; `from_phases(**kwargs)` (classmethod) y
+    properties nombradas de solo lectura (p. ej. `.gas`, `.liquid`) son
+    ergonomía de borde, no el contrato — construyen o leen sobre el array
+    empaquetado, nunca lo reemplazan. Consecuencia: `_rebuild` queda uniforme
+    en toda la jerarquía (`ScalarRateBase` y `VectorRateBase` reciben y
+    devuelven el mismo tipo de `value`, un `ArrayLike`), sin rama especial
+    para el caso multi-cantidad.
 
 ## Convenciones de testing (capa physics)
 
