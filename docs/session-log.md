@@ -25,6 +25,73 @@
 
 ---
 
+## 2026-08-14 — código: organización de módulos e imports
+
+> Sesión mixta: instrucción mecánica inicial a Claude Code (`ArrayLike` a
+> `fluidnet._types`, rename `CompressibleFluid` → `CompressibleFluidBase`,
+> `single_phase_fluids.py` → `single_phase.py`, fachadas de `state/`,
+> `import-linter`), pero buena parte de la ejecución terminó siendo del
+> usuario en el editor en paralelo — Claude Code verificó/cerró lo que
+> quedaba suelto en cada pasada (mypy, pytest, lint-imports).
+
+**Cerrado:**
+
+- `CLAUDE.md` #32-34: alias de tipo transversales en `fluidnet/_types.py`
+  (capa −1); `physics/`/`state/` hermanos sin import lateral; política de
+  `__init__.py` (fachada re-exporta, código interno importa del módulo que
+  define); abstracto (`protocol.py`) vs. concreto (`state/fluids/`) como eje
+  de profundidad, no de hermandad; `StateModel` es el contrato, las ABC
+  (`CompressibleFluidBase`) son conveniencia opcional para implementadores.
+- `ArrayLike` movido a `fluidnet._types` (capa −1), `physics/types.py` solo
+  conserva `GradientResult`. Sweep completo de imports en `src/` y `tests/`
+  (incluye un descuido real del primer commit del usuario: `physics/types.py`
+  había quedado con `ArrayLike` duplicado en vez de importado).
+- `CompressibleFluid` → `CompressibleFluidBase` en definición, subclases,
+  tests y docstrings.
+- `state/fluids/single_phase_fluids.py` → `single_phase.py`.
+- Fachadas: `state/fluids/__init__.py` exporta también `CompressibleFluidBase`;
+  `state/__init__.py` exporta el set completo (+ `IdealGas`/`RealGas`) y su
+  docstring ya no menciona `IsothermalGas` (nombre que nunca existió).
+  `fluidnet/__init__.py` reducido a `__version__` vía `importlib.metadata`.
+  Dos tests (`test_single_phase_fluids.py`, `test_gas.py`) importaban de la
+  fachada `fluidnet.state.fluids` en vez del módulo que define — corregido.
+- `import-linter` agregado a `dev`, tres contratos en `pyproject.toml`
+  (`layers` top-down con capas opcionales entre paréntesis, `independence`
+  physics/state, `forbidden` capa cero vs. `networkx`/`pandas`).
+  **Rojo→verde real, pero no por lo que se anticipaba**: la sintaxis de
+  `layers` dada originalmente (`"state : physics"` sin `containers`) no
+  valida contra `import-linter` 2.13 instalado — sin `containers` cada
+  nombre de layer se busca como módulo top-level literal (`state`, no
+  `fluidnet.state`); tocó pausar y reportar en vez de reescribir el
+  contrato por cuenta propia (condición de parada explícita de la
+  instrucción). El usuario probó una variante con `containers=["fluidnet"]`
+  y capas obligatorias (creó `network/`, `rate/`, `solvers/` vacíos para
+  que existieran) — falló por `fluidnet.losses` faltante. Se resolvió
+  volviendo a capas opcionales (`"(solvers)"`, `"(network) : (losses)"`,
+  `"(rate)"`) + `containers=["fluidnet"]` (necesario, no estaba en la
+  sintaxis original) + `include_external_packages = true` (lo exige el
+  contrato `forbidden` sobre paquetes externos) — sin materializar paquetes
+  vacíos. Verde final: `Contracts: 3 kept, 0 broken.`
+- Los cinco checks en verde: `mypy` (18 archivos), `pytest` (127 passed, 14
+  xfailed), `lint-imports` (3/3). `ruff check`/`ruff format --check` tienen
+  deuda preexistente sin relación con esta sesión (1 import sin ordenar en
+  `test_beggs_brill_vs_fluids.py`, 15 archivos sin formatear) — no tocada,
+  fuera de alcance.
+
+**Abierto:**
+
+- `_beggs_brill_detailed` sigue cruzando `physics/multiphase/__init__.py`
+  tal cual estaba — pendiente de la decisión de diseño de diagnósticos
+  nivel 1 (#25), no se tocó a propósito.
+- No hay CI (`.github/workflows/`) donde enganchar `lint-imports` — queda
+  como ítem de la sección "Infraestructura de repositorio" de `ROADMAP.md`.
+
+**Próximo paso:**
+- Retomar el roadmap de física/estado (v0.2) donde estaba antes de esta
+  sesión de limpieza — ver la entrada de abajo (golden Z-factor).
+
+---
+
 ## 2026-08-14 — código: golden Z-factor vs. Standing-Katz (Kamyab et al. 2010) + `RealGas.z()` bonus
 
 > Continuación directa de la entrada de abajo (mismo día): cierra el ítem
