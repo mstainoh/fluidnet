@@ -85,7 +85,7 @@ containers = ["fluidnet"]
 layers = [
     "(solvers)",
     "(network) : (losses)",
-    "(rate)",
+    "rate",
     "state : physics",
     "_types",
 ]
