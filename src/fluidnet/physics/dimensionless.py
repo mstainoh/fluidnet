@@ -3,7 +3,7 @@
 import numpy as np
 import scipy.constants as spc
 
-from .types import ArrayLike
+from fluidnet._types import ArrayLike
 
 
 def reynolds(

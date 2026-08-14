@@ -15,7 +15,7 @@ from typing import NamedTuple, cast
 import numpy as np
 import numpy.typing as npt
 
-from fluidnet.physics.types import ArrayLike
+from fluidnet._types import ArrayLike
 from fluidnet.state.protocol import BoundStateModel
 
 

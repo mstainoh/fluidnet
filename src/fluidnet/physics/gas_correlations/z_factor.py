@@ -8,7 +8,7 @@ from typing import cast
 import numpy as np
 from scipy.optimize import newton
 
-from fluidnet.physics.types import ArrayLike
+from fluidnet._types import ArrayLike
 
 
 def z_hall_yarborough(

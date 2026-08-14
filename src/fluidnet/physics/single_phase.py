@@ -5,9 +5,11 @@ import warnings
 import numpy as np
 import scipy.constants as spc
 
+from fluidnet._types import ArrayLike
+
 from .dimensionless import reynolds
 from .friction import friction_factor
-from .types import ArrayLike, GradientResult
+from .types import GradientResult
 
 
 def single_phase_gradient(

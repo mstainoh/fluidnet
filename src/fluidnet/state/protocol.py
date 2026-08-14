@@ -40,7 +40,7 @@ from __future__ import annotations
 
 from typing import Protocol, TypeVar
 
-from fluidnet.physics.types import ArrayLike
+from fluidnet._types import ArrayLike
 
 S_co = TypeVar("S_co", bound="State", covariant=True)
 

@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from fluidnet.physics.types import ArrayLike
+from fluidnet._types import ArrayLike
 
 
 def sutherland_viscosity(

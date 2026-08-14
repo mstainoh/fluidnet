@@ -13,9 +13,10 @@ from typing import Any, cast
 import numpy as np
 import scipy.constants as spc
 
+from fluidnet._types import ArrayLike
 from fluidnet.physics.dimensionless import froude, reynolds
 from fluidnet.physics.friction import friction_factor
-from fluidnet.physics.types import ArrayLike, GradientResult
+from fluidnet.physics.types import GradientResult
 
 FLOW_REGIMES = ("segregated", "intermittent", "distributed", "transition")
 

@@ -4,7 +4,7 @@ from collections.abc import Callable
 
 import scipy.constants as spc
 
-from fluidnet.physics.types import ArrayLike
+from fluidnet._types import ArrayLike
 
 from .single_phase_fluids import CompressibleFluid
 
