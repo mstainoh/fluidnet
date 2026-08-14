@@ -343,7 +343,9 @@ tenía lugar en este documento.
   classifiers de `pyproject.toml` declaran soporte que nadie verificó), con
   `ruff`, `ruff format --check`, `mypy`, `lint-imports` y `pytest` sobre
   instalación limpia. Adelantable a v0.5 si la deriva entre sesiones vuelve a
-  costar tiempo.
+  costar tiempo. Puente vigente: `pre-commit` local cubre `ruff` y
+  `lint-imports` desde v0.2; lo que CI agrega y el puente no puede dar es el
+  ambiente limpio y la matriz de versiones.
 - **Community guidelines** — `CONTRIBUTING.md` y `.github/ISSUE_TEMPLATE/`:
   cómo contribuir, cómo reportar problemas, cómo pedir ayuda. Ítem explícito
   del checklist de revisión de JOSS.

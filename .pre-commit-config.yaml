@@ -1,0 +1,18 @@
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.0        # fijar la versión que ya usás; no dejar flotante
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+      - id: ruff-format
+
+  # import-linter necesita el paquete instalado: corre contra el venv local,
+  # no en un entorno aislado que gestione pre-commit.
+  - repo: local
+    hooks:
+      - id: lint-imports
+        name: contratos de capas (import-linter)
+        entry: lint-imports
+        language: system
+        pass_filenames: false
+        always_run: true

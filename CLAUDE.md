@@ -423,6 +423,8 @@ Rate ──► composición (intensiva)
     código interno y los tests importan del módulo que define.
     `fluidnet/__init__.py` expone solo `__version__` hasta v1.0. Verificado por
     `import-linter` (`lint-imports`).
+    Los contratos de `import-linter` corren automáticamente vía `pre-commit`; el
+    comando canónico sigue siendo `lint-imports` sin argumentos.
 33. **Abstracto vs. concreto es un eje de profundidad, no de hermandad.** El
     protocolo vive en `<paquete>/protocol.py`; las implementaciones concretas en
     subpaquetes por dominio (`state/fluids/`, y a futuro `state/electrical/`). No
