@@ -346,6 +346,11 @@ tenía lugar en este documento.
   costar tiempo. Puente vigente: `pre-commit` local cubre `ruff` y
   `lint-imports` desde v0.2; lo que CI agrega y el puente no puede dar es el
   ambiente limpio y la matriz de versiones.
+- **Activar `pre-commit` local** — `pre-commit install` en el venv de
+  desarrollo (una vez por clon). El `.pre-commit-config.yaml` ya existe
+  desde v0.2, pero el hook no se dispara solo en `git commit` hasta correr
+  el instalador — acción de operador, deliberadamente no automatizada por
+  la sesión de código que lo armó.
 - **Community guidelines** — `CONTRIBUTING.md` y `.github/ISSUE_TEMPLATE/`:
   cómo contribuir, cómo reportar problemas, cómo pedir ayuda. Ítem explícito
   del checklist de revisión de JOSS.
