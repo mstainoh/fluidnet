@@ -25,6 +25,44 @@
 
 ---
 
+## 2026-08-14 — código: pre-commit (ruff + lint-imports)
+
+**Cerrado:**
+
+- `.pre-commit-config.yaml` creado: `ruff-check --fix` + `ruff-format` (rev
+  `v0.16.0`, la versión ya instalada) y hook local `lint-imports`.
+  `pre-commit` agregado a `dev` en `pyproject.toml`. No se corrió
+  `pre-commit install` (acción del operador, no de la sesión).
+- `README_CLAUDE.md` creado (protocolo de trabajo, separado de `CLAUDE.md`):
+  sección "Verificación" — automático por commit (`pre-commit`) vs. manual al
+  cerrar sesión (`mypy`, `pytest`).
+- `CLAUDE.md` #32: línea agregada — los contratos de `import-linter` corren
+  automáticamente vía `pre-commit`; el comando canónico sigue siendo
+  `lint-imports` sin argumentos.
+- `ROADMAP.md`, ítem "CI mínimo": nota de puente — `pre-commit` local ya
+  cubre `ruff` y `lint-imports` desde v0.2; lo que CI agrega y el puente no
+  puede dar es el ambiente limpio y la matriz de versiones.
+- `pre-commit run --all-files`: `lint-imports` pasó limpio (3/3). `ruff check
+  --fix` + `ruff format` resolvieron la deuda de formato que la sesión de
+  organización de imports (entrada de abajo) había dejado explícitamente
+  fuera de alcance — 13 archivos reformateados, solo cosmético (indentación
+  de firmas kw-only, newlines finales, líneas en blanco), sin cambios de
+  lógica. Verificado aparte con `mypy` (18 archivos, limpio) y `pytest`
+  (mismo resultado que antes del reformateo).
+- Split en dos commits atómicos: setup de pre-commit + docs por un lado, el
+  reformateo resultante de ruff por otro.
+
+**Abierto:**
+
+- CI (`.github/workflows/`) sigue sin existir — `pre-commit` es el puente
+  declarado en `ROADMAP.md`, no el reemplazo.
+
+**Próximo paso:**
+- Retomar el roadmap de física/estado (v0.2) — ver entrada de golden
+  Z-factor más abajo.
+
+---
+
 ## 2026-08-14 — código: organización de módulos e imports
 
 > Sesión mixta: instrucción mecánica inicial a Claude Code (`ArrayLike` a
