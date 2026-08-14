@@ -7,10 +7,11 @@ from fluidnet._types import ArrayLike
 
 
 def reynolds(
-        v: ArrayLike,
-        D: ArrayLike,
-        density: ArrayLike,
-        viscosity: ArrayLike,) -> ArrayLike:
+    v: ArrayLike,
+    D: ArrayLike,
+    density: ArrayLike,
+    viscosity: ArrayLike,
+) -> ArrayLike:
     """Reynolds number ``Re = v * D * rho / mu``.
 
     Parameters
@@ -51,10 +52,10 @@ def froude(v: ArrayLike, D: ArrayLike) -> ArrayLike:
 
 
 def mach(
-        velocity: ArrayLike,
-        density: ArrayLike,
-        compressibility: ArrayLike,
-        ) -> ArrayLike:
+    velocity: ArrayLike,
+    density: ArrayLike,
+    compressibility: ArrayLike,
+) -> ArrayLike:
     """Mach number ``M = v / c`` with ``c = 1 / sqrt(rho * beta)``.
 
     Parameters
@@ -73,7 +74,7 @@ def mach(
 
     Notes
     -----
-    The speed of sound is obtained from the compressibility, 
+    The speed of sound is obtained from the compressibility,
     ``c**2 = 1 / (rho * beta)``, rather than from an ideal-gas
     expression. No equation of state is assumed here.
 

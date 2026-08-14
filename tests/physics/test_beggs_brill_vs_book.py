@@ -69,7 +69,11 @@ def test_kermit_brown_example_4_7() -> None:
         rel_err = abs(calc[key] - expected) / expected
         logger.info(
             "%s: calc=%.5g book=%.5g rel_err=%.4f (tol=%.2f)",
-            key, calc[key], expected, rel_err, tol,
+            key,
+            calc[key],
+            expected,
+            rel_err,
+            tol,
         )
         assert rel_err < tol, f"{key}: got {calc[key]:.5g}, book {expected:.5g}"
 
@@ -79,14 +83,18 @@ def test_kermit_brown_example_4_7() -> None:
     gravity_err = abs(-calc["gradient"].gravity - dpg_book) / dpg_book
     logger.info(
         "gradient.gravity: calc=%.5g book=%.5g rel_err=%.4f (tol=0.05)",
-        -calc["gradient"].gravity, dpg_book, gravity_err,
+        -calc["gradient"].gravity,
+        dpg_book,
+        gravity_err,
     )
     assert gravity_err < 0.05
 
     friction_err = abs(-calc["gradient"].friction - dpf_book) / dpf_book
     logger.info(
         "gradient.friction: calc=%.5g book=%.5g rel_err=%.4f (tol=0.10)",
-        -calc["gradient"].friction, dpf_book, friction_err,
+        -calc["gradient"].friction,
+        dpf_book,
+        friction_err,
     )
     assert friction_err < 0.10
 
@@ -115,7 +123,8 @@ def test_checalc_case_no_payne() -> None:
 
     logger.info(
         "liquid_fraction=%.5g liquid_holdup=%.5g (expected Cl < Hl <= 1)",
-        calc["liquid_fraction"], calc["liquid_holdup"],
+        calc["liquid_fraction"],
+        calc["liquid_holdup"],
     )
     assert calc["liquid_fraction"] < calc["liquid_holdup"] <= 1
 

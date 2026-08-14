@@ -26,7 +26,7 @@ class TestFrictionFactor:
             friction_factor(-1.0, D=0.1, eps=1e-4)
 
     def test_vectorized_regimes(self) -> None:
-        f = friction_factor([500, 3000, 1e5], D=0.1, eps=1e-4) #type: ignore
+        f = friction_factor([500, 3000, 1e5], D=0.1, eps=1e-4)  # type: ignore
         assert np.asarray(f).shape == (3,)
         assert np.all(f > 0)
 

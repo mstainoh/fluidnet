@@ -58,8 +58,9 @@ def beggs_brill_flowmap(Cl: ArrayLike, NFr: ArrayLike) -> int | np.ndarray:
 
     if not np.all(m0 | m1 | m2 | m3):
         bad = ~(m0 | m1 | m2 | m3)
-        raise ValueError(f"invalid values for Cl {np.atleast_1d(Cl)[bad]} "
-                         "and NFr {np.atleast_1d(NFr)[bad]}")
+        raise ValueError(
+            f"invalid values for Cl {np.atleast_1d(Cl)[bad]} and NFr {{np.atleast_1d(NFr)[bad]}}"
+        )
     regime: int | np.ndarray = m1 * 1 + m2 * 2 + m3 * 3
     return regime
 
@@ -101,9 +102,7 @@ def _holdup(
         L2 = 0.0009252 * Cl**-2.4684
         L3 = 0.1 * Cl**-1.4516
         A = (L3 - NFr) / (L3 - L2)
-        return A * _holdup(0, Cl, NFr, Nlv, angle) + (1 - A) * _holdup(
-            1, Cl, NFr, Nlv, angle
-        )
+        return A * _holdup(0, Cl, NFr, Nlv, angle) + (1 - A) * _holdup(1, Cl, NFr, Nlv, angle)
     else:
         raise ValueError("regime index must be in 0..3")
     el0 = a * Cl**b / NFr**c
@@ -118,9 +117,7 @@ def _holdup(
         else:  # i == 1
             d, e, f, g = 2.96, 0.305, -0.4473, 0.0978
         C = (1 - Cl) * np.log(d * Cl**e * Nlv**f * NFr**g)
-        b_theta = 1 + np.clip(C, 0, np.inf) * (
-            np.sin(1.8 * angle) - np.sin(1.8 * angle) ** 3 / 3
-        )
+        b_theta = 1 + np.clip(C, 0, np.inf) * (np.sin(1.8 * angle) - np.sin(1.8 * angle) ** 3 / 3)
     return el0 * b_theta
 
 

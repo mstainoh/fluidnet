@@ -42,7 +42,11 @@ class TestFlowmapVectorized:
         Cl = np.array([0.005, 0.05, 0.05, 0.2, 0.5])
         NFr = np.array([10.0, 0.5, 4.0, 5.0, 100.0])
         expected_regimes = [
-            "segregated", "segregated", "transition", "intermittent", "distributed",
+            "segregated",
+            "segregated",
+            "transition",
+            "intermittent",
+            "distributed",
         ]
 
         idx = beggs_brill_flowmap(Cl, NFr)
@@ -88,14 +92,16 @@ class TestDetailedScalarContract:
 
     def test_detailed_scalar_contract_today(self) -> None:
         """Scalars in -> scalars out; no stray 0-d array leaks into GradientResult."""
-        calc = _beggs_brill_detailed(
-            mass_rate_liquid=0.8, mass_rate_gas=0.05, **DETAILED_ARGS
-        )
+        calc = _beggs_brill_detailed(mass_rate_liquid=0.8, mass_rate_gas=0.05, **DETAILED_ARGS)
         grad = calc["gradient"]
 
         for value in (
-            grad.total, grad.gravity, grad.friction, grad.momentum,
-            calc["NFr"], calc["liquid_holdup"],
+            grad.total,
+            grad.gravity,
+            grad.friction,
+            grad.momentum,
+            calc["NFr"],
+            calc["liquid_holdup"],
         ):
             assert np.ndim(value) == 0
             assert not isinstance(value, np.ndarray)
@@ -108,7 +114,9 @@ class TestDetailedScalarContract:
         with pytest.raises(ValueError, match="ambiguous"):
             _beggs_brill_detailed(mass_rate_liquid=ql, mass_rate_gas=qg, **DETAILED_ARGS)
 
-    @pytest.mark.xfail(strict=True, reason="v0.5 roadmap: broadcast rates -> vectorized GradientResult")
+    @pytest.mark.xfail(
+        strict=True, reason="v0.5 roadmap: broadcast rates -> vectorized GradientResult"
+    )
     def test_detailed_vectorized_over_rates(self) -> None:
         ql = np.array([0.8, 1.0, 1.2])
         qg = np.array([0.05, 0.06, 0.07])
@@ -134,7 +142,9 @@ class TestGradientScalarContract:
         with pytest.raises(ValueError, match="ambiguous"):
             beggs_brill_gradient(mass_rate_liquid=ql, mass_rate_gas=qg, **DETAILED_ARGS)
 
-    @pytest.mark.xfail(strict=True, reason="v0.5 roadmap: broadcast rates -> vectorized GradientResult")
+    @pytest.mark.xfail(
+        strict=True, reason="v0.5 roadmap: broadcast rates -> vectorized GradientResult"
+    )
     def test_gradient_vectorized_over_rates(self) -> None:
         ql = np.array([0.8, 1.0, 1.2])
         qg = np.array([0.05, 0.06, 0.07])

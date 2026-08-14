@@ -35,9 +35,7 @@ class IdealGas(CompressibleFluidBase):
         :func:`functools.partial` before passing ``viscosity_fn`` in.
     """
 
-    def __init__(
-        self, *, molecular_weight: float, viscosity_fn: Callable[..., ArrayLike]
-    ) -> None:
+    def __init__(self, *, molecular_weight: float, viscosity_fn: Callable[..., ArrayLike]) -> None:
         self.molecular_weight = molecular_weight
         self.viscosity_fn = viscosity_fn
 

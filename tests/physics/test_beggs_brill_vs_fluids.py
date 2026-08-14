@@ -40,6 +40,7 @@ orientaciones (horizontal, uphill, vertical, downhill).
 
 import logging
 from typing import cast
+
 import numpy as np
 import pytest
 import scipy.constants as spc
@@ -49,13 +50,13 @@ from fluidnet.physics.multiphase import _beggs_brill_detailed
 logger = logging.getLogger(__name__)
 
 # Sistema de fluido común a los 8 casos golden.
-RHO_LIQUID = 850.0     # kg/m3
-RHO_GAS = 25.0         # kg/m3
-MU_LIQUID = 3.0e-3     # Pa.s
-MU_GAS = 1.3e-5        # Pa.s
-SIGMA = 0.020          # N/m
-ROUGHNESS = 4.6e-5     # m
-D = 0.1                # m
+RHO_LIQUID = 850.0  # kg/m3
+RHO_GAS = 25.0  # kg/m3
+MU_LIQUID = 3.0e-3  # Pa.s
+MU_GAS = 1.3e-5  # Pa.s
+SIGMA = 0.020  # N/m
+ROUGHNESS = 4.6e-5  # m
+D = 0.1  # m
 
 # Valores generados corriendo fluids v1.3.1 localmente (ver
 # docs/session-log.md 2026-08-07 para el script de generación). Formato:
@@ -173,31 +174,46 @@ def test_golden_vs_fluids_pinned(name: str) -> None:
         roughness=ROUGHNESS,
         sigma=SIGMA,
         payne_correction=False,
-
         # compressibility=0.0 (default) -> momentum=0, total=gravity+friction
         compressibility_gas=0.0,
         compressibility_liquid=0.0,
     )
 
-    logger.info("[%s] flow_regime: calc=%s fluids=%s",
-                name, calc["flow_regime"], case["flow_regime"])
+    logger.info(
+        "[%s] flow_regime: calc=%s fluids=%s", name, calc["flow_regime"], case["flow_regime"]
+    )
     assert calc["flow_regime"] == case["flow_regime"]
 
-    for key, attr in [("liquid_holdup", "liquid_holdup"),
-                       ("mixture_density", "mixture_density")]:
+    for key, attr in [("liquid_holdup", "liquid_holdup"), ("mixture_density", "mixture_density")]:
         expected, tol = cast(tuple[float, float], case[attr])
         err = _rel_err(calc[key], expected)
-        logger.info("[%s] %s: calc=%.6g fluids=%.6g rel_err=%.2e (tol=%.2e)",
-                    name, key, calc[key], expected, err, tol)
+        logger.info(
+            "[%s] %s: calc=%.6g fluids=%.6g rel_err=%.2e (tol=%.2e)",
+            name,
+            key,
+            calc[key],
+            expected,
+            err,
+            tol,
+        )
         assert err < tol, f"{name}/{key}: got {calc[key]:.6g}, fluids {expected:.6g}"
 
     g = calc["gradient"]
-    for key, attr, val in [("gravity", "grad_gravity", g.gravity),
-                            ("friction", "grad_friction", g.friction)]:
+    for key, attr, val in [
+        ("gravity", "grad_gravity", g.gravity),
+        ("friction", "grad_friction", g.friction),
+    ]:
         expected, tol = cast(tuple[float, float], case[attr])
         err = _rel_err(val, expected)
-        logger.info("[%s] gradient.%s: calc=%.6g fluids=%.6g rel_err=%.4f (tol=%.3f)",
-                    name, key, val, expected, err, tol)
+        logger.info(
+            "[%s] gradient.%s: calc=%.6g fluids=%.6g rel_err=%.4f (tol=%.3f)",
+            name,
+            key,
+            val,
+            expected,
+            err,
+            tol,
+        )
         assert err < tol, f"{name}/gradient.{key}: got {val:.6g}, fluids {expected:.6g}"
 
     # compressibility=0 -> invariante: total == gravity + friction exacto
@@ -235,17 +251,32 @@ def test_against_fluids_live(name: str) -> None:
     m = cast(float, case["mass_rate_liquid"]) + cast(float, case["mass_rate_gas"])
     x = cast(float, case["mass_rate_gas"]) / m
     dp_fluids = fluids_tp.Beggs_Brill(
-        m=m, x=x, rhol=RHO_LIQUID, rhog=RHO_GAS, mul=MU_LIQUID, mug=MU_GAS,
-        sigma=SIGMA, P=1e5, D=D, angle=case["angle_deg"], roughness=ROUGHNESS,
-        L=1.0, acceleration=False,
+        m=m,
+        x=x,
+        rhol=RHO_LIQUID,
+        rhog=RHO_GAS,
+        mul=MU_LIQUID,
+        mug=MU_GAS,
+        sigma=SIGMA,
+        P=1e5,
+        D=D,
+        angle=case["angle_deg"],
+        roughness=ROUGHNESS,
+        L=1.0,
+        acceleration=False,
     )
     # fluids: dP = p_up - p_down (positivo = pérdida). fluidnet:
     # gradient.total = p_down - p_up por longitud (pérdida -> negativo).
     expected_total = -dp_fluids
 
     err = _rel_err(calc["gradient"].total, expected_total)
-    logger.info("[%s] live: calc=%.6g fluids=%.6g rel_err=%.4f (tol=0.015)",
-                name, calc["gradient"].total, expected_total, err)
+    logger.info(
+        "[%s] live: calc=%.6g fluids=%.6g rel_err=%.4f (tol=0.015)",
+        name,
+        calc["gradient"].total,
+        expected_total,
+        err,
+    )
     assert err < 0.015, (
         f"{name}: pinned value may be stale, got {calc['gradient'].total:.6g}, "
         f"live fluids {expected_total:.6g}"
@@ -296,10 +327,13 @@ def test_holdup_within_physical_bounds() -> None:
     lambda_L = Vsl / Vm
     LV = Vsl * (RHO_LIQUID / (spc.g * SIGMA)) ** 0.25
     hl_fluids_raw = fluids_tp._Beggs_Brill_holdup(
-        0, lambda_L, Fr, np.deg2rad(angle_deg), LV  # regime 0 = segregated
+        0,
+        lambda_L,
+        Fr,
+        np.deg2rad(angle_deg),
+        LV,  # regime 0 = segregated
     )
     logger.info("liquid_holdup (fluids, unclipped): %.5f (expected < 0)", hl_fluids_raw)
     assert hl_fluids_raw < 0.0, (
-        "fluids ya no da holdup negativo para este caso -- buscar otro "
-        "ángulo/Cl para el guard test"
+        "fluids ya no da holdup negativo para este caso -- buscar otro ángulo/Cl para el guard test"
     )
