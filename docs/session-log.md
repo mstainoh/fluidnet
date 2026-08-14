@@ -25,6 +25,76 @@
 
 ---
 
+## 2026-08-14 — código: refactor Z-factor (`gas_correlations/z_factor.py`) + vectorización
+
+> Continuación de la sesión de viscosidad de gas (ver entrada de abajo, mismo
+> día). `z_factor.py` existía como dos correlaciones (Hall-Yarborough,
+> Dranchuk-Abou-Kassem) con docstrings en castellano, `math` en vez de
+> `numpy`, y sin exportar en `__init__.py` — pedido inicial: refactor de
+> forma (numpydoc inglés, `numpy`, export). Sobre la marcha, dos vueltas más
+> pedidas por el usuario: sacar los loops de Newton hechos a mano (usar
+> `scipy.optimize.newton`) y, ya que la implementación es toda `numpy`,
+> asegurar que las firmas fueran `ArrayLike`/vectorizables en vez de
+> `float`-only. Sesión no cerrada: sigue con la validación contra el golden
+> dataset Kamyab et al. (2010) JPSE (36 puntos Tpr/Ppr/Z, digitalización del
+> chart Standing-Katz), a instrucciones del usuario en el próximo paso.
+
+**Cerrado:**
+
+- **Refactor de forma**: docstrings numpydoc en inglés, `math.exp` →
+  `np.exp`, exportadas en `gas_correlations/__init__.py` (`__all__`
+  explícito junto a las de viscosidad).
+- **Loops de Newton manuales → `scipy.optimize.newton`**: Hall-Yarborough
+  usa la derivada analítica que ya estaba escrita (`fprime=dF`, sin cambio
+  de fórmula); Dranchuk-Abou-Kassem tenía una derivada aproximada por
+  diferencias finitas *manuales* (`dZ=1e-6`) — se saca esa aproximación y se
+  deja el método de secante interno de `scipy.optimize.newton` resolver.
+- **Firmas a `ArrayLike`** (`pressure_reduced`/`temperature_reduced`/
+  return), consistente con `physics/types.py`. Tres ajustes necesarios para
+  que de verdad vectorice y no solo tipe:
+  1. el guard `Tpr <= 1.0` pasa a `np.any(np.asarray(Tpr) <= 1.0)` — con
+     array, un solo elemento inválido sigue lanzando `ValueError` en vez de
+     comparar ambiguamente o dejar pasar NaN;
+  2. los `return float(...)` se sacan (rompían con arrays de tamaño > 1),
+     reemplazados por `cast(ArrayLike, ...)`;
+  3. en Dranchuk-Abou-Kassem, el guess inicial `Z0` pasa de constante
+     `1.0` a `np.ones_like(Ppr * Tpr)` — necesario para que el guess tenga
+     la forma broadcast correcta y dispare el path array de
+     `scipy.optimize.newton` (que decide por `np.size(x0)`, no por el
+     tamaño de lo que devuelven `F`/`f`).
+  Housekeeping de tipos: dos `# type: ignore[arg-type]` puntuales en las
+  llamadas a `newton()` — el stub de scipy tipa el overload array-only como
+  `(ndarray, /, *Any, **Any) -> ndarray` y las closures internas (`F`, `dF`,
+  `f`, marcadas positional-only) no calzan textualmente esa forma aunque
+  son correctas en runtime para ambos casos (escalar y array).
+- `tests/physics/test_z_factor.py` (nuevo, 5 tests): Hall-Yarborough y
+  Dranchuk-Abou-Kassem coinciden entre sí en una condición típica (sanity de
+  fórmula, no golden); llamada vectorizada == loop escalar elemento a
+  elemento para ambas correlaciones; guard de `Tpr` dispara `ValueError`
+  tanto en escalar como cuando un solo elemento de un array es inválido.
+- `pytest` verde, `python -m mypy` limpio.
+
+**Abierto:**
+
+- **Golden dataset real pendiente**: Kamyab et al. (2010) JPSE, 36 puntos
+  Tpr/Ppr/Z digitalizados del chart Standing-Katz — mencionado por el
+  usuario, instrucciones todavía no dadas. Objetivo: reemplazar/complementar
+  el sanity check cruzado HY-vs-DAK de `test_z_factor.py` con un golden real
+  de literatura, mismo patrón que `test_beggs_brill_vs_book.py` /
+  `test_gas_viscosity_vs_book.py`.
+- La nota "Abierto" de la entrada de abajo (mismo día, sesión de viscosidad)
+  decía que `z_factor.py` era "un placeholder vacío" — quedó desactualizada
+  por este trabajo; no se reescribe la entrada histórica, se deja
+  constancia acá.
+
+**Próximo paso:**
+
+- Validar Hall-Yarborough/Dranchuk-Abou-Kassem contra el golden
+  Kamyab et al. (2010) cuando el usuario dé las instrucciones (dataset,
+  tolerancias, formato del test).
+
+---
+
 ## 2026-08-14 — código: inyección de propiedades en viscosidad de gas + fix `1e-4` en LGE
 
 > Continuación de la sesión de `RealGas`/`IdealGas` (ver más abajo). Pedido
