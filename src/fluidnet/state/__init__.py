@@ -7,15 +7,23 @@ Two pieces, deliberately separate:
     ``Protocol``. Knows nothing about fluids; the same shape fits an
     electrical AC demo.
 ``fluids``
-    ``SinglePhaseFluidState`` (+ future ``MultiPhaseFluidState``) and
-    ``IncompressibleFluid`` (+ future ``IsothermalGas``) — the
-    fluid-specific implementation of that protocol.
+    ``SinglePhaseFluidState``, ``IncompressibleFluid``,
+    ``CompressibleFluidBase`` (+ concrete EOS ``IdealGas``/``RealGas``) —
+    the fluid-specific implementation of that protocol. ``StateModel`` is
+    the contract; ``CompressibleFluidBase`` is convenience for
+    implementers, not a requirement (``CLAUDE.md`` #34).
 
-See ``CLAUDE.md`` decisions #4-#7, #18, #19, #26, #28, #30 and
+See ``CLAUDE.md`` decisions #4-#7, #18, #19, #26, #28, #30, #34 and
 ``docs/design/architecture-v0.2.md`` §2.1bis.
 """
 
-from .fluids import IncompressibleFluid, SinglePhaseFluidState
+from .fluids import (
+    CompressibleFluidBase,
+    IdealGas,
+    IncompressibleFluid,
+    RealGas,
+    SinglePhaseFluidState,
+)
 from .protocol import BoundStateModel, State, StateModel
 
 __all__ = [
@@ -24,4 +32,7 @@ __all__ = [
     "State",
     "SinglePhaseFluidState",
     "IncompressibleFluid",
+    "CompressibleFluidBase",
+    "IdealGas",
+    "RealGas",
 ]

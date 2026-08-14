@@ -3,7 +3,7 @@
 import pytest
 
 from fluidnet.physics.single_phase import single_phase_gradient
-from fluidnet.state.fluids import IncompressibleFluid, SinglePhaseFluidState
+from fluidnet.state.fluids.single_phase import IncompressibleFluid, SinglePhaseFluidState
 
 
 class TestSinglePhaseFluidState:

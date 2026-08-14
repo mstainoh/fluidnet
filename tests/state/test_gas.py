@@ -8,7 +8,7 @@ import scipy.constants as spc
 
 from fluidnet._types import ArrayLike
 from fluidnet.physics.gas_correlations import z_dranchuk_abou_kassem, z_hall_yarborough
-from fluidnet.state.fluids import IdealGas, RealGas
+from fluidnet.state.fluids.gas import IdealGas, RealGas
 
 METHANE_MOLAR_WEIGHT = 16.043e-3  # kg/mol
 METHANE_VISCOSITY = 10.84e-6  # Pa*s, assumed constant
