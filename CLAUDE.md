@@ -267,6 +267,8 @@ Rate ──► composición (intensiva)
     de entrega: nombre canónico + valor en SI. **`loss_func` compone, no
     traduce**: la aridad multifásica es cómputo (`Rate` da el extensivo,
     `StateModel` la fracción, el producto da los rates por fase).
+    Corolario en `Rate`: el nombre canónico es `ClassVar` de la subclase
+    (#22), nunca argumento de `__init__`.
 22. **`Rate` se define por contrato, no por contenido**: *puedo sumarme con
     otros y dar balance cero, y puedo meterme en una loss func.*
     - `as_physics_kwargs()` **sí existe** en `Rate` — lo extensivo va a la
@@ -284,6 +286,71 @@ Rate ──► composición (intensiva)
       depende de un flash `(P, T, comp)` y cambia a lo largo del caño: es
       trabajo de EOS. Un `StateModel` de fracción impuesta es válido como
       hipótesis explícita de modelado, pero es un fluido, no un rate.
+    - **Firma genérica con `Self` (corrección 2026-08-14).** El protocolo
+      declara `__add__(self, other: Self) -> Self`. Los parámetros son
+      contravariantes: un protocolo que promete `other: Rate` obliga a toda
+      implementación a aceptar cualquier `Rate`, y
+      `BrineRate.__add__(other: BrineRate)` deja de satisfacerlo bajo
+      `--strict`. Con `Self`, mypy rechaza `MassRate + BrineRate`
+      estáticamente y el retorno preserva el tipo concreto.
+    - **Sin `__radd__`, sin `mix()`, sin `__sub__`.** El balance de nodo es
+      `reduce(add, rates)`, que sólo requiere `__add__`. `sum()` arranca en
+      `0` y ensuciaría la firma con `Literal[0]`; un `mix()` como método
+      contradice #34. `__sub__` no tiene cliente e invita a
+      `rate_in - rate_out`, el patrón que cancela el denominador de
+      `_combine`: quitarlo hace el invariante estructural en vez de
+      documental. `__neg__` se queda (orientación de arista).
+    - **Sin `@runtime_checkable`.** Verifica presencia de métodos, no
+      firmas, y no verifica `physics_key` (un `ClassVar` sin valor no existe
+      en runtime). Un `isinstance` que pasa para clases rotas es peor que no
+      tenerlo.
+    - **El nombre canónico es `ClassVar`.** Un `name` por instancia es la
+      tabla de renombres de #21 distribuida en vez de centralizada, con el
+      mismo modo de falla. Corolario: el solver no declara ningún parámetro
+      de nombre.
+    - **`__array_ufunc__ = None` en `BaseRate`.** Sin eso, `ndarray * rate`
+      gana precedencia y construye un array de objetos en vez de delegar a
+      `__rmul__`.
+    - **No heredar de `float` ni de `ndarray`.** `float.__add__` devuelve
+      `float` plano: el balance en nodo rompe la abstracción. Heredar
+      declara sustituibilidad por un número en todo contexto, lo contrario
+      de la frontera `Rate` vs. propiedad de fluido de #3. Consistente con
+      #34.
+    - **`BaseRate` separa `_rebuild` de `_combine`.** Es la codificación
+      literal de las dos reglas de #3: `_rebuild(value)` = *mismo intensivo,
+      nuevo extensivo* (`__mul__` y `__neg__` salen correctos por
+      construcción, la composición es invariante bajo escalado);
+      `_combine(other)` = la regla de mezcla. Una subclase composicional
+      overridea esas dos y nada más. `__slots__` vive acá, no en el
+      `Protocol`; cada subclase declara el suyo o recupera el `__dict__`.
+    - **El solver opera sobre `value`; el álgebra de `Rate` es de la capa de
+      propagación.** El balance numérico suma extensivos crudos y adentro
+      del `solve_ivp` circulan arrays, no objetos `Rate` (#22, hoisting).
+      `__add__` es la operación de `propagate_rates`, pasada topológica
+      sobre la red ya resuelta.
+    - **Composición como trazador pasivo (v0.2).** `BrineRate` propaga y
+      mezcla composición **sin efecto sobre las propiedades físicas**. Es
+      hipótesis de modelado explícita, no versión incompleta: es lo que
+      elimina la dependencia circular temida en `mass_balance`. Cuando haya
+      realimentación (v2+) sigue siendo iteración externa desacoplada
+      (Picard), no un solve simultáneo.
+    - **La composición se representa como `dict[str, ArrayLike]`.** La
+      objeción original (iterar dict en el loop interno del optimizer, sin
+      vectorizar) asumía que la mezcla corría dentro del solve. No corre.
+      Sin esa restricción el dict gana sobre el array denso: no necesita
+      registro de especies a nivel red ni convención de ejes, y la clave
+      ausente ya es el cero de la mezcla (`.get(k, 0.0)`) — por eso la
+      composición vacía es `{}` y nunca `None`. Se mantiene que `MassRate`
+      no lleva el campo: uniformidad en el método, no en el dato.
+    - **`BrineRate` valida positividad en `__init__`; `BaseRate` no.** Un
+      caudal másico negativo con composición positiva no tiene significado
+      físico, y la mezcla ponderada lo convierte en composición negativa sin
+      activar ningún guard (`+5` con `−4` da denominador 1, resultado finito
+      y absurdo). El chequeo en `__init__` lo agarra en el nacimiento, y
+      cubre los negativos que llegan vía `__neg__`/`_rebuild` porque pasan
+      por el constructor. No asciende a `BaseRate`: escalares, vectores y
+      fasores admiten negativos legítimamente (#3, `ComplexRate`). Es
+      invariante de caudal, no de through-variable.
 23. **Conversión de unidades fuera del contrato de `LossFunc`** — atributo de
     `Network`, capa de I/O. Si `loss_func` convierte, la decisión #1 (SI
     estricto) se vuelve nominal, y es de las que un reviewer chequea leyendo

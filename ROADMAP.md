@@ -667,3 +667,20 @@ circuitos cerrados: hidráulica de edificios, procesos con recirculación.
 - **Herning-Zipperer como mixing rule de viscosidad** (`μ_mix` desde `μᵢ`
   por componente) — gancho natural cuando la propagación de composición
   llegue a la capa de transporte (v1.5). *(2026-08-14)*
+- **¿Renombrar `Rate` → `Flow`?** Sugerido al arrancar el protocolo
+  (`rate/protocol.py`). Por ahora se sigue con `Rate` — no bloquea la
+  implementación de `ScalarRate`. *(2026-08-14)*
+- **Balance de nodo vía `reduce(add, rates)` y mezcla ponderada de v1.5.**
+  El protocolo `Rate` cerró sin `__radd__` ni `mix()` — el balance de nodo
+  se arma con `functools.reduce(operator.add, rates)`, que solo requiere
+  `__add__`. Si la mezcla ponderada de composición (v1.5) necesita una
+  pasada única con acumuladores separados de extensivo e intensivo, el
+  fold por pares de `reduce` hay que revisarlo. Para suma ponderada
+  estándar no pierde precisión, así que no bloquea v0.2. *(2026-08-14)*
+- **`BrineRate._combine` guarda `total == 0` asumiendo numerador nulo (nodo
+  con todos los aportes cerrados).** La hipótesis se rompe si confluyen
+  aportes de signo mixto: el guard devuelve un valor finito sin sentido en
+  vez de fallar. Inalcanzable en v0.2 — la validación de positividad en
+  `__init__` lo bloquea aguas arriba y el DAG mantiene signos consistentes.
+  Al habilitar ciclos o convenciones de signo mixtas, convertir el guard en
+  `raise`: la condición ya está escrita, es la misma rama. *(2026-08-14)*

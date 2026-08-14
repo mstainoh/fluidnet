@@ -25,6 +25,115 @@
 
 ---
 
+## 2026-08-14 — Diseño: protocolo `Rate` y `BrineRate`
+
+**Cerrado.** `Protocol` con `Self`; `physics_key` como `ClassVar`; sin
+`__radd__`, `__sub__`, `mix()` ni `@runtime_checkable`. `BaseRate` como
+conveniencia opcional (#34) con `__slots__`, `__array_ufunc__ = None` y el
+par `_rebuild`/`_combine`. `MassRate`, `VolumetricRate` y `BrineRate` en
+`rate/fluids/` (`single_phase.py` + `brine.py`, espejando
+`state/protocol.py` + `state/fluids/`, #33). Composición como
+`dict[str, ArrayLike]`, trazador pasivo, vacía es `{}`. Positividad
+validada en `BrineRate.__init__`. Balance de nodo vía `reduce(add, rates)`.
+
+**Desbloqueado.** `propagate_rates` — el álgebra de `Rate` está cerrada y
+testeada.
+
+**Abierto** → `ROADMAP §Abiertas`.
+
+---
+
+## 2026-08-14 — Diseño: protocolo `Rate`
+
+**Cerrado.** Protocolo con `Self` en ambas posiciones de `__add__`;
+`physics_key` como `ClassVar`; sin `__radd__`, sin `mix()`, sin
+`@runtime_checkable`. `BaseRate` como conveniencia opcional (#34) en
+`rate/base.py`, con `__slots__`, `__array_ufunc__ = None` y el par
+`_rebuild`/`_combine`. Balance de nodo vía `reduce(add, rates)`.
+
+**Desbloqueado.** `ScalarRate` — el spec está cerrado, se puede implementar.
+
+**Abierto (a `ROADMAP §Abiertas`).** Si la mezcla ponderada de v1.5 necesita
+una pasada única con acumuladores separados de extensivo e intensivo, el
+fold por pares de `reduce` hay que revisarlo. Para suma ponderada estándar
+no pierde precisión, así que no bloquea v0.2.
+
+---
+
+## 2026-08-14 — código: `rate/protocol.py` (protocolo `Rate`)
+
+> Arquitectura resuelta en sesión de diseño con Claude web (no en esta
+> sesión de código): forma del protocolo `Rate` — genérico con `Self` en
+> vez de con `Rate`, nombre canónico como `ClassVar`, `__array_ufunc__ =
+> None`, sin herencia de `float`/`ndarray`. El snippet de
+> `rate/protocol.py` llegó ya escrito y el usuario lo aplicó directo al
+> archivo antes de esta sesión; el trabajo acá fue mecánico: crear el
+> paquete, transcribir el protocolo tal cual sin reinterpretarlo ni
+> extenderlo, aplicar las correcciones dadas a `CLAUDE.md` #21/#22, y
+> verificar.
+
+**Cerrado:**
+
+- `src/fluidnet/rate/` creado: `__init__.py` (exporta solo `Rate`) +
+  `protocol.py` (protocolo `Rate`, ya transcripto por el usuario antes de
+  esta sesión).
+- **`__add__`/`__radd__`/`__mul__`/`__rmul__`/`__neg__` tipados con `Self`,
+  no con `Rate`.** Razón: los parámetros de estos métodos son
+  contravariantes — un protocolo que promete `other: Rate` obliga a toda
+  implementación a aceptar cualquier `Rate`, y `BrineRate.__add__(other:
+  BrineRate)` dejaría de satisfacerlo bajo `--strict`. Con `Self` el
+  contrato es *me sumo con otro de mi propio tipo*: mypy rechaza
+  `ScalarRate + BrineRate` estáticamente y el tipo concreto sobrevive
+  `sum()` sin cast.
+- **Nombre canónico (`physics_key`) como `ClassVar`, no campo de
+  instancia.** Evita la tabla de renombres distribuida que #21 ya prohíbe
+  centralizada — el nombre es propiedad del tipo (`MassRate` siempre
+  entrega `mass_rate`), no de cada instancia.
+- **`CLAUDE.md` #21**: línea cruzada agregada — corolario en `Rate`, el
+  nombre canónico es `ClassVar` de la subclase (#22), nunca argumento de
+  `__init__`.
+- **`CLAUDE.md` #22**: cuatro sub-bullets agregados (firma con `Self`,
+  `ClassVar` del nombre canónico, `__array_ufunc__ = None` en la base
+  concreta, no heredar de `float`/`ndarray`) — texto dado por el usuario,
+  pegado sin reformular.
+- `python -m mypy`: limpio (21 archivos). `lint-imports`: 3/3 contratos en
+  verde (`rate/` solo importa de `fluidnet._types`, ya declarado como capa
+  opcional en `pyproject.toml`).
+
+**Abierto:**
+
+- **`CLAUDE.md` #22, referencia rota**: el bloque de "no heredar de
+  `float`/`ndarray`" tal como se dio termina citando "#56" como la
+  decisión que sostiene la frontera `Rate` vs. propiedad de fluido —
+  `CLAUDE.md` no pasa de #34, así que la referencia no apunta a nada. Se
+  pegó tal cual (instrucción explícita de no reformular); pendiente que el
+  usuario confirme cuál era el número real.
+- **Tres decisiones sin cerrar, señaladas por el propio chat de diseño,
+  bloquean congelar el protocolo:**
+  1. `__radd__` vs. `sum()`: `sum()` arranca en `int` (`0`), y `__radd__`
+     tipado a `Self` no cubre ese caso — `sum(rates)` no tipa tal como
+     está. Alternativas sobre la mesa: ensuciar la firma
+     (`Self | Literal[0]`) o sacar `__radd__`/`sum()` y exponer
+     `Rate.mix(iterable)` (preferencia del chat de diseño, sin cerrar) —
+     que además sería el gancho natural para la mezcla ponderada de v1.5
+     cuando el intensivo deje de sumar linealmente.
+  2. `@runtime_checkable`: solo verifica presencia de métodos, no firmas —
+     sirve para un `assert` de test, no como validación real. Sacarlo si
+     no se va a usar en tests.
+  3. `__slots__`: no va en el `Protocol` (no tiene instancias) — va en la
+     ABC de conveniencia (`BaseRate`), que por #33 vive en el subpaquete
+     concreto (`rate/scalar.py` o similar), no en `protocol.py`.
+- No se creó ninguna implementación concreta (`ScalarRate`, `BrineRate`):
+  fuera de alcance explícito de esta tarea.
+
+**Próximo paso:**
+
+- Cerrar la referencia rota en `CLAUDE.md` #22 y las tres decisiones de
+  arriba (probablemente en sesión de diseño, no de código) antes de
+  escribir `ScalarRate`.
+
+---
+
 ## 2026-08-14 — código: pre-commit (ruff + lint-imports)
 
 **Cerrado:**
