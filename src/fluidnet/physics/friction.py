@@ -7,7 +7,7 @@ arguments make that class of bug impossible.
 """
 import numpy as np
 
-from fluidnet.physics.types import ArrayLike
+from fluidnet._types import ArrayLike
 
 
 def _chen_approx(re: ArrayLike, D: ArrayLike, eps: ArrayLike) -> ArrayLike:

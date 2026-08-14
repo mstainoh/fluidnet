@@ -1,14 +1,8 @@
-"""Shared type aliases and result containers for the physics layer."""
+"""Physics-specific result containers. ``ArrayLike`` lives in ``fluidnet._types``."""
 
-from typing import NamedTuple, TypeAlias
+from typing import NamedTuple
 
-import numpy as np
-import numpy.typing as npt
-
-#: A physics quantity: either a Python float or a numpy array of floats.
-#: Every pure physics function in this package is ``SI -> SI`` and
-#: vectorized, so inputs/outputs are typed with this alias throughout.
-ArrayLike: TypeAlias = float | npt.NDArray[np.float64]
+from fluidnet._types import ArrayLike
 
 
 class GradientResult(NamedTuple):
