@@ -1,4 +1,4 @@
-"""Tests for IdealGas and RealGas (CompressibleFluid) — methane at STP."""
+"""Tests for IdealGas and RealGas (CompressibleFluidBase) — methane at STP."""
 
 from collections.abc import Callable
 

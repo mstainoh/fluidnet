@@ -59,7 +59,7 @@ class IncompressibleFluid:
         return bound
 
 
-class CompressibleFluid(ABC):
+class CompressibleFluidBase(ABC):
     """Pressure-dependent fluid: density/viscosity/compressibility are an EOS
     evaluated per bound state, not fixed at construction (#4).
 

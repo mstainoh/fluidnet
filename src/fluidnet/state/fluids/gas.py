@@ -6,10 +6,10 @@ import scipy.constants as spc
 
 from fluidnet._types import ArrayLike
 
-from .single_phase_fluids import CompressibleFluid
+from .single_phase import CompressibleFluidBase
 
 
-class IdealGas(CompressibleFluid):
+class IdealGas(CompressibleFluidBase):
     """Ideal-gas EOS: ``rho = P / (R_specific * T)`` (#4).
 
     Parameters
@@ -89,7 +89,7 @@ class IdealGas(CompressibleFluid):
         return 1 / pressure
 
 
-class RealGas(CompressibleFluid):
+class RealGas(CompressibleFluidBase):
     """Real-gas EOS: ``rho = P / (Z * R_specific * T)`` (#4).
 
     Parameters
