@@ -53,9 +53,14 @@ argumento estructural para no reordenar v0.5 detrás de nada.
    conocen la red; `Network` no conoce la física; los solvers orquestan;
    `Result` lo produce solo el solver.
 4. **Core SI estricto.** Unidades de presentación solo en la capa de I/O.
-5. **Commits chicos contra `main` limpia**, en el orden del mapa de rescate
+5. **Commits chicos contra `dev` limpia**, en el orden del mapa de rescate
    desde mineplanner.
-6. **Todo claim declarado se verifica automáticamente, o se borra.** Si
+6. **Branches**: `main` únicamente toma versión estable. `dev` es la rama de
+   trabajo. Commits directos contra `dev` permitidos para: arquitectura
+   (modificaciones a los `.md`), refactors chicos (documentación, nombres,
+   reordenamiento de archivos). Todo feature va en un branch dedicado, que
+   mergea de vuelta a `dev` al cerrarse.
+7. **Todo claim declarado se verifica automáticamente, o se borra.** Si
    `pyproject.toml` dice que soporta 3.10, hay un job que lo prueba. Si
    `CLAUDE.md` dibuja capas, hay un contrato que las chequea. Si un docstring
    promete un rango de validez, hay un test en ese rango. La alternativa no es
@@ -415,7 +420,7 @@ circuitos cerrados: hidráulica de edificios, procesos con recirculación.
 4. ~~Mecanismo de `@diagnostic`~~ — **cerrado (2026-08-10), ya no bloquea.**
    `darcy_weisbach` se implementa sin él.
 5. **Implementar** por piezas chicas siguiendo el mapa de rescate del ADR §3,
-   commiteando de a poco contra `main` limpia. **En curso (2026-08-13)**:
+   commiteando de a poco contra `dev` limpia. **En curso (2026-08-13)**:
    `state/protocol.py` + `state/fluids/single_phase_fluids.py`
    (`SinglePhaseFluidState` + `IncompressibleFluid` MVP) con tests. Sigue
    `Rate`/`ScalarRate`, luego `Network`/solver 1.

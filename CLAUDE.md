@@ -470,7 +470,7 @@ Rate ──► composición (intensiva)
 2. **No implementes nada que no tenga firma/decisión cerrada.** Si algo no
    está en "Decisiones cerradas" de este archivo ni en el ADR
    correspondiente en `docs/design/`, para y preguntá — no asumas.
-3. Commits atómicos, chicos, contra `main` limpia.
+3. Commits atómicos, chicos, contra `dev` limpia.
 4. Al cerrar la sesión: actualizá `docs/session-log.md` (qué se cerró, qué
    quedó abierto, próximo paso en una frase) antes de terminar.
 
