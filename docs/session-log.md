@@ -1636,3 +1636,36 @@ no pierde precisión, así que no bloquea v0.2.
 **Próximo paso:**
 - Primera sesión de código: confirmar si el MVP de 26 tests aparece en
   alguna carpeta local antes de empezar a reconstruir nada desde cero.
+
+---
+
+## 2026-08-14 — diseño
+
+**Cerrado:**
+
+- Housekeeping de `ROADMAP.md`/`CLAUDE.md` aplicado: referencias a
+  `Rate`/`BaseRate` (#35–#37) y `BoundStateModel` sincronizadas, rename
+  `state/fluids/single_phase.py` reflejado en todos los bullets que
+  correspondía, ítem 1 de §Secuencia inmediata marcado **Implementado**.
+- Infraestructura de repositorio (§v1.0) adelantada a v0.2: el scope de
+  mypy sobre `tests/` necesita un ambiente limpio con registro, y la
+  sesión de infra es autocontenida (no depende de ninguna decisión de
+  diseño abierta).
+- Tres entradas nuevas en `ROADMAP §Abiertas`: primera subclase concreta
+  de `VectorRateBase`, scope de mypy sobre `tests/` (con dirección
+  propuesta: `strict = true` global + override para `tests.*`), y rate
+  variable en `x` para black-oil (mecanismo propuesto vía #21: `Rate`
+  aporta el extensivo total, `StateModel` emite la fracción de fase).
+- Fragmento de prompt de una sesión ya cerrada, pegado por error dentro
+  de `CLAUDE.md` (sección "## 10. ROADMAP.md"), eliminado.
+
+**Abierto** → `ROADMAP §Abiertas`: primera subclase concreta de
+`VectorRateBase`; scope de mypy sobre `tests/`; rate variable en `x`
+(black-oil).
+
+**Próximo paso:**
+
+- Sesión de código de infraestructura: `.github/workflows/checks.yml`
+  (matriz 3.10/3.12), `CONTRIBUTING.md`, `CITATION.cff` + Zenodo.
+- Después: sesión de diseño de `Result` + firmas de `LossFunc` + caso
+  demo.

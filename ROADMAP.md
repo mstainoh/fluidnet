@@ -338,9 +338,13 @@ tag `v1.0`.
 
 ### Infraestructura de repositorio (sesión de código dedicada)
 
-Bloque que hoy no existe: `dev` no tiene `.github/` en absoluto. Se agrupa
-porque JOSS lo revisa como conjunto y porque el DOI (prioridad temporal) no
-tenía lugar en este documento.
+Bloque que hoy no existe: `dev` no tiene `.github/` en absoluto.
+**Adelantado a v0.2 (2026-08-14)**: el scope de mypy sobre `tests/`
+(ver §Abiertas) necesita un ambiente limpio donde quede registro, y el
+trabajo es una sesión de código autocontenida que no depende de
+ninguna decisión de diseño abierta. Se agrupa porque JOSS lo revisa
+como conjunto y porque el DOI (prioridad temporal) no tenía lugar en
+este documento.
 
 - **CI mínimo** — `.github/workflows/checks.yml`: matriz 3.10/3.12 (los
   classifiers de `pyproject.toml` declaran soporte que nadie verificó), con
@@ -434,8 +438,10 @@ circuitos cerrados: hidráulica de edificios, procesos con recirculación.
    `state/protocol.py` + `state/fluids/single_phase_fluids.py`
    (`SinglePhaseFluidState` + `IncompressibleFluid` MVP) con tests.
    `Rate` implementado y testeado (protocolo, `BaseRate` ABC con los dos
-   hermanos, `MassRate`/`VolumetricRate`/`BrineRate`). Sigue el diseño de
-   `Result` y las firmas de `LossFunc` (ítem 3), luego `Network`/solver 1.
+   hermanos, `MassRate`/`VolumetricRate`/`BrineRate`). Sigue la sesión de
+   infraestructura de repositorio (ver §v1.0, adelantada), después el
+   diseño de `Result` y las firmas de `LossFunc` (ítem 3), y recién ahí
+   `Network`/solver 1.
 
 ---
 
@@ -708,3 +714,36 @@ circuitos cerrados: hidráulica de edificios, procesos con recirculación.
   `tests/test_rate_base.py`. El contrato de eje queda declarado y
   verificado, sin consumidor real hasta que exista un rate multifásico
   (v1.5, o antes si el caso demo lo pide). *(2026-08-14)*
+- **Scope de mypy sobre `tests/`.** `[tool.mypy] packages =
+  ["fluidnet"]` deja `tests/` fuera del comando canónico `python -m
+  mypy`. Ya costó una vez: el 2026-08-13 el comando canónico daba limpio
+  mientras `python -m mypy tests/state/test_gas.py` tiraba 7 errores
+  `"State" has no attribute "density"` — el bug real del
+  `BoundStateModel` no genérico. Se repite ahora con más consecuencia:
+  los dummies de `test_rate_base.py` son los únicos ejercitantes de
+  `VectorRateBase`, así que su contrato está verificado en runtime pero
+  no estáticamente. Contra el principio 7 (todo claim declarado se
+  verifica automáticamente). **Dirección propuesta**: `strict = true`
+  global + override `[[tool.mypy.overrides]] module = "tests.*"` que
+  afloje lo legítimamente sucio de los tests (`disallow_untyped_defs =
+  false` como mínimo), mismo comando en `pre-commit` y en CI. Abierto:
+  qué más aflojar sin volver el chequeo decorativo. *(2026-08-14)*
+- **Rate variable en `x` (black-oil).** El hoisting de
+  `as_physics_kwargs()` fuera del `solve_ivp` (#22) se licencia en que el
+  mass rate es constante a lo largo del eje. En black-oil el gas sale de
+  solución al caer `P` y el mass rate **por fase** varía con `x` — el
+  total se conserva. No se resuelve mutando el `Rate` desde el
+  `StateModel` (lo volvería consumidor del `Rate` y rompería capa cero,
+  #4; además sería estado mutable dentro del `rhs`, con `solve_ivp`
+  reevaluando pasos rechazados). Se resuelve con el mecanismo ya cerrado
+  en #21: el `Rate` aporta el extensivo total (constante, hoisteado sin
+  cambios), el `StateModel` emite la fracción de fase como función de
+  `(x, across)` — un flash `(P, T, composición)`, o sea EOS, coherente
+  con el retiro de `MultiphaseRate` del 2026-08-09 — y el producto da los
+  rates por fase. Es una capa fina que convierte caudal total en caudales
+  de mezcla; el multifásico explícito pasa a ser un monofásico acoplado
+  que el `State` divide en fases. **Abierto**: dónde vive el producto
+  cuando llegue el primer multifásico real — en `loss_func` (hoy es
+  afirmación de diseño sin firma ni consumidor) o el `State` emite ya los
+  rates por fase. Conecta con la entrada de composición en
+  `VectorRateBase`. *(2026-08-14)*
