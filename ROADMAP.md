@@ -194,10 +194,10 @@ suficiente. `IsothermalGas` y fluidos composicionales llegan en v1.0/v1.5.
 
 **Hecho (sesión de código 2026-08-13)**:
 
-- `state/protocol.py` — `StateModel`, `BoundState`, `State` como `Protocol`,
+- `state/protocol.py` — `StateModel`, `BoundStateModel`, `State` como `Protocol`,
   con la firma corregida (composición fuera del `Protocol`, `across:
   ArrayLike`).
-- `state/fluids/single_phase_fluids.py` — `SinglePhaseFluidState`
+- `state/fluids/single_phase.py` — `SinglePhaseFluidState`
   (`NamedTuple`: `density`/`viscosity`/`compressibility`, nombres canónicos
   de `single_phase_gradient`) + `IncompressibleFluid` (props constantes,
   MVP de esta capa). `MultiPhaseFluidState` y el resto de `IsothermalGas`
@@ -227,10 +227,13 @@ todo agua, o pozos de composición equivalente.
 
 **Scope IN**
 
-- `Rate` (ABC/Protocol) + `ScalarRate` con álgebra: `__add__`, `__radd__`
-  (para que `sum()` no rompa el polimorfismo), `__mul__`. Contenido:
-  magnitud extensiva + composición intensiva, **sin propiedades de fluido**.
-  → *forma exacta de la composición trivial pendiente; ver "Abiertas".*
+- `Rate` (`Protocol`) + `BaseRate` (ABC de conveniencia) con los hermanos
+  `ScalarRateBase`/`VectorRateBase` (#35–#37). Álgebra: `__add__`,
+  `__mul__`, `__neg__` — sin `__radd__`, sin `mix()`, sin `__sub__`
+  (`CLAUDE.md` #22); el balance de nodo es `reduce(add, rates)`.
+  Implementaciones concretas en `rate/fluids/`: `MassRate`,
+  `VolumetricRate`, `BrineRate`. Contenido: magnitud extensiva +
+  composición intensiva, **sin propiedades de fluido**.
 - `Fluid` + `FluidState` con `IncompressibleFluid` como única implementación.
   Propiedades derivadas del `Fluid`, nunca almacenadas en el `Rate` ni como
   atributo suelto de red.
@@ -418,7 +421,7 @@ circuitos cerrados: hidráulica de edificios, procesos con recirculación.
 1. ~~Cerrar la forma concreta de `Rate`/`ScalarRate` y `Fluid`/`FluidState`~~ —
    **cerrado (2026-08-10)**. Composición trivial, `as_physics_kwargs()`,
    `StateModel`/`BoundState` y forma de `FluidState`: todo con spec.
-   **Siguiente: sesión de código.**
+   **Implementado.**
 2. **Diseño del caso demo** — red sintética de wellfield: inputs, outputs, qué
    muestra el notebook. Define los tests de aceptación y tensiona las firmas de
    `Rate`/`Fluid` contra un uso real. Sin código.
@@ -429,8 +432,10 @@ circuitos cerrados: hidráulica de edificios, procesos con recirculación.
 5. **Implementar** por piezas chicas siguiendo el mapa de rescate del ADR §3,
    commiteando de a poco contra `dev` limpia. **En curso (2026-08-13)**:
    `state/protocol.py` + `state/fluids/single_phase_fluids.py`
-   (`SinglePhaseFluidState` + `IncompressibleFluid` MVP) con tests. Sigue
-   `Rate`/`ScalarRate`, luego `Network`/solver 1.
+   (`SinglePhaseFluidState` + `IncompressibleFluid` MVP) con tests.
+   `Rate` implementado y testeado (protocolo, `BaseRate` ABC con los dos
+   hermanos, `MassRate`/`VolumetricRate`/`BrineRate`). Sigue el diseño de
+   `Result` y las firmas de `LossFunc` (ítem 3), luego `Network`/solver 1.
 
 ---
 
@@ -544,7 +549,7 @@ circuitos cerrados: hidráulica de edificios, procesos con recirculación.
   ella. De paso, la ubicación de `GradientResult` ("hoy vive en
   `single_phase.py`") también estaba stale: vive en `physics/types.py`
   desde el mismo commit `9780d43`; `SinglePhaseFluidState` vive en
-  `state/fluids/single_phase_fluids.py`. Ambas preguntas de ubicación de
+  `state/fluids/single_phase.py`. Ambas preguntas de ubicación de
   la entrada "Abiertas" quedan resueltas. `IncompressibleFluid` sigue
   construyéndose con `float` (un `float` es un `ArrayLike` válido, no se
   ensancha nada). `self._asdict()` sigue devolviendo `dict[str, Any]`, no
@@ -697,3 +702,9 @@ circuitos cerrados: hidráulica de edificios, procesos con recirculación.
   toca `VectorRateBase`); aparece recién cuando un rate multifásico necesite
   cargar composición, que es v1.5. Anotado a partir de este refactor de
   `BaseRate`, no antes. *(2026-08-14)*
+- **Primera subclase concreta de `VectorRateBase`.** El esqueleto está
+  implementado y testeado (#35–#37) pero no hay ninguna subclase en el
+  package — los únicos ejercitantes son los dummies de
+  `tests/test_rate_base.py`. El contrato de eje queda declarado y
+  verificado, sin consumidor real hasta que exista un rate multifásico
+  (v1.5, o antes si el caso demo lo pide). *(2026-08-14)*

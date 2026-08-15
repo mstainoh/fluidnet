@@ -588,15 +588,6 @@ Rate ──► composición (intensiva)
 4. Al cerrar la sesión: actualizá `docs/session-log.md` (qué se cerró, qué
    quedó abierto, próximo paso en una frase) antes de terminar.
 
-## 10. ROADMAP.md
-
-- Agregar el principio 6 al final de §Principios que ordenan el plan
-  (texto exacto provisto por el usuario, pegar sin reformular).
-- Agregar el bloque "Infraestructura de repositorio" al final de §v1.0
-  (texto exacto provisto, pegar sin reformular).
-- No reordenar ni reescribir nada más del documento.
-- NO crear `.github/` en esta sesión: es una sesión de código aparte.
-
 ## Dónde está cada cosa
 
 - `ROADMAP.md` — plan de 3 etapas (MVP v0.2 / v1 / v2), scope in/out por etapa.
