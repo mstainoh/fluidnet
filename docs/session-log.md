@@ -25,6 +25,45 @@
 
 ---
 
+## 2026-08-14 — código: `BaseRate` → ABC (`ScalarRateBase`/`VectorRateBase`, #35–#37)
+
+**Cerrado:**
+
+- `rate/base.py`: `BaseRate` pasa a `ABC`, `as_physics_kwargs` como
+  `@abstractmethod`, sin `physics_key`/`physics_keys` propio. Dos
+  hermanos sin herencia entre sí (#35): `ScalarRateBase` (`physics_key:
+  ClassVar[str]`, contrato de un solo nombre) y `VectorRateBase`
+  (`physics_keys: ClassVar[tuple[str, ...]]`, `__init__` valida
+  `ndim == 0` o `shape[0] != len(physics_keys)` con `ValueError`
+  explícito, `as_physics_kwargs` vía `dict(zip(physics_keys, value,
+  strict=True))` — sin invertir el zip). Convención de eje `(n_cantidades,
+  *shape_escenario)` documentada en el docstring de la clase (#36).
+- `MassRate`, `VolumetricRate` (`rate/fluids/single_phase.py`) y
+  `BrineRate` (`rate/fluids/brine.py`) migradas de `BaseRate` a
+  `ScalarRateBase`. Ningún consumidor anotaba contra `BaseRate` fuera del
+  re-export de `rate/__init__.py`, así que no hubo nada que reportar.
+- Sin subclase concreta de `VectorRateBase` en el package todavía (spec
+  #37, implementación pendiente).
+- `tests/test_rate_base.py` nuevo (mirror de `test_rate_algebra.py`):
+  dummies `_ScalarTestRate`/`_TwoPhaseTestRate` definidos en el test, no
+  en el package. Cobertura: mapeo clave↔fila explícito contra el zip
+  invertido, validación de construcción (escalar y `shape[0]` incorrecto),
+  broadcast de split contra el eje de escenario (`(2,5) * (5,)`),
+  `__add__` cruzado (`NotImplemented` directo + `TypeError` en ambos
+  sentidos), `__array_ufunc__ = None` (`ndarray * rate`), `_rebuild`
+  preserva tipo concreto en `__mul__`/`__neg__`/`__add__` para ambos
+  hermanos.
+- `python -m mypy` limpio (24 archivos, tests fuera de scope — mismo
+  criterio que `test_rate_algebra.py`), suite completa en verde
+  (`xfail(strict=True)` de roadmap incluidos), `lint-imports` 3/3.
+
+**Abierto** → `ROADMAP §Abiertas`: primera subclase concreta de
+`VectorRateBase` (rate multifásico real, #22).
+
+**Próximo paso:** ninguno bloqueado por esta sesión.
+
+---
+
 ## 2026-08-14 — Diseño: protocolo `Rate` y `BrineRate`
 
 **Cerrado.** `Protocol` con `Self`; `physics_key` como `ClassVar`; sin
