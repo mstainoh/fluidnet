@@ -103,6 +103,4 @@ class TestRebuildPreservesConcreteType:
         rate = _TwoPhaseTestRate(np.array([1.0, 2.0]))
         assert isinstance(rate * 3, _TwoPhaseTestRate)
         assert isinstance(-rate, _TwoPhaseTestRate)
-        assert isinstance(
-            rate + _TwoPhaseTestRate(np.array([1.0, 2.0])), _TwoPhaseTestRate
-        )
+        assert isinstance(rate + _TwoPhaseTestRate(np.array([1.0, 2.0])), _TwoPhaseTestRate)

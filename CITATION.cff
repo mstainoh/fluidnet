@@ -1,0 +1,25 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "fluidnet: graph-first steady-state fluid network simulation"
+abstract: >-
+  A Python library for steady-state simulation of fluid networks, built on a
+  graph-first architecture with a polymorphic rate abstraction that propagates
+  composition through the network and pluggable, physics-agnostic loss
+  functions. Designed for field calibration of network parameters against
+  operational observations.
+type: software
+authors:
+  - given-names: Marcelo
+    family-names: Stainoh
+    email: mstainoh@gmail.com
+    orcid: "https://orcid.org/0000-0001-5088-800X"
+repository-code: "https://github.com/mstainoh/fluidnet"
+url: "https://github.com/mstainoh/fluidnet"
+license: MIT
+keywords:
+  - fluid-networks
+  - hydraulics
+  - pipe-flow
+  - multiphase-flow
+  - network-simulation
+  - python
