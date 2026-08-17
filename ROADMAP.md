@@ -336,35 +336,27 @@ impuesta). El grafo sigue siendo un DAG.
 **Criterio de salida:** 3 solvers operativos · un caso multifásico documentado ·
 tag `v1.0`.
 
-### Infraestructura de repositorio (sesión de código dedicada)
+### Infraestructura de repositorio (sesión de código dedicada) · CERRADA (2026-08-17)
 
-Bloque que hoy no existe: `dev` no tiene `.github/` en absoluto.
-**Adelantado a v0.2 (2026-08-14)**: el scope de mypy sobre `tests/`
-(ver §Abiertas) necesita un ambiente limpio donde quede registro, y el
-trabajo es una sesión de código autocontenida que no depende de
-ninguna decisión de diseño abierta. Se agrupa porque JOSS lo revisa
-como conjunto y porque el DOI (prioridad temporal) no tenía lugar en
-este documento.
+Bloque que no existía: `dev` no tenía `.github/` en absoluto.
+**Adelantado a v0.2 (2026-08-14)**, cerrado el 2026-08-17 — ver
+`docs/session-log.md` de esa fecha para el detalle completo.
 
-- **CI mínimo** — `.github/workflows/checks.yml`: matriz 3.10/3.12 (los
-  classifiers de `pyproject.toml` declaran soporte que nadie verificó), con
-  `ruff`, `ruff format --check`, `mypy`, `lint-imports` y `pytest` sobre
-  instalación limpia. Adelantable a v0.5 si la deriva entre sesiones vuelve a
-  costar tiempo. Puente vigente: `pre-commit` local cubre `ruff` y
-  `lint-imports` desde v0.2; lo que CI agrega y el puente no puede dar es el
-  ambiente limpio y la matriz de versiones.
-- **Activar `pre-commit` local** — `pre-commit install` en el venv de
-  desarrollo (una vez por clon). El `.pre-commit-config.yaml` ya existe
-  desde v0.2, pero el hook no se dispara solo en `git commit` hasta correr
-  el instalador — acción de operador, deliberadamente no automatizada por
-  la sesión de código que lo armó.
-- **Community guidelines** — `CONTRIBUTING.md` y `.github/ISSUE_TEMPLATE/`:
-  cómo contribuir, cómo reportar problemas, cómo pedir ayuda. Ítem explícito
-  del checklist de revisión de JOSS.
-- **Citabilidad** — `CITATION.cff` + workflow de release por tag + integración
-  Zenodo. Produce el DOI archivado y versionado que fija fecha de prioridad.
-- **Coverage reportado** en CI. Opcional para JOSS, barato una vez que hay
-  workflow.
+- **CI mínimo** — `.github/workflows/checks.yml`: matriz 3.10/3.12,
+  `permissions`/`concurrency`, `pre-commit run --all-files` (ruff pineado +
+  `lint-imports`), `python -m mypy`, `pytest --cov` (baseline 95%).
+  Pusheado y corriendo — **hoy en rojo por 8 errores de mypy** que no
+  reproducen en local (Windows/3.12) vs. CI (Ubuntu/3.10+3.12); plan de
+  arreglo en `docs/session-log.md` 2026-08-17, próxima sesión.
+- **`pre-commit` local** — cubre `ruff` y `lint-imports` desde v0.2.
+- **Citabilidad** — `CITATION.cff` (con ORCID) y `CODE_OF_CONDUCT.md`
+  (Contributor Covenant 2.1) creados; Zenodo habilitado. Sin DOI hasta el
+  primer release — el tag va sobre `main`, que todavía no existe:
+  "crear `main` desde `dev`" es parte del checklist de release, no del
+  día del tag.
+- **Community guidelines** — `CONTRIBUTING.md` sigue sin escribir.
+  Obligatorio para el submit a JOSS, no urgente antes. Ver §Abiertas.
+- **Coverage reportado** en CI — hecho, integrado al step de `pytest`.
 
 Riesgo de dejarlo para el final: es la clase de ítem que se descubre tarde y
 empuja la fecha de submit sin aportar nada al diseño.
@@ -444,10 +436,12 @@ circuitos cerrados: hidráulica de edificios, procesos con recirculación.
    `state/protocol.py` + `state/fluids/single_phase_fluids.py`
    (`SinglePhaseFluidState` + `IncompressibleFluid` MVP) con tests.
    `Rate` implementado y testeado (protocolo, `BaseRate` ABC con los dos
-   hermanos, `MassRate`/`VolumetricRate`/`BrineRate`). Sigue la sesión de
-   infraestructura de repositorio (ver §v1.0, adelantada), después el
-   diseño de `Result` y las firmas de `LossFunc` (ítem 3), y recién ahí
-   `Network`/solver 1.
+   hermanos, `MassRate`/`VolumetricRate`/`BrineRate`). La sesión de
+   infraestructura de repositorio (ver §v1.0) cerró el 2026-08-17; firmas
+   de `LossFunc`/`EdgeResult` cerradas a nivel de contrato el mismo día
+   (ítem 3), falta implementarlas. **Próximo paso real: diseño del caso
+   demo (ítem 2)** — ancla el diseño de `Result`, que queda como sesión en
+   paralelo.
 
 ---
 
@@ -614,6 +608,14 @@ circuitos cerrados: hidráulica de edificios, procesos con recirculación.
   (normalizado en `[0, 1]` o `int`, escalado por `L` en cada llamada — una
   grilla absoluta rompería la invariante stateless de #38). Ver `CLAUDE.md`
   #44–#45.
+- **Versiones de herramientas de calidad pineadas en `[dev]` (2026-08-17).**
+  `ruff==0.16.0` alineado con el `rev` de `.pre-commit-config.yaml`.
+  Motivo: la divergencia entre el `ruff` del venv y el del hook produce
+  reformateos que bailan entre commits; la divergencia de versión de
+  `mypy` ya produjo un CI rojo con el local en verde (ver
+  `docs/session-log.md`, 2026-08-17). Regla general: toda herramienta que
+  emite juicios sobre el código (linter, formatter, type checker) va
+  pineada a versión exacta; el bump es explícito y ocupa un commit propio.
 
 ### Abiertas
 
@@ -753,11 +755,19 @@ circuitos cerrados: hidráulica de edificios, procesos con recirculación.
   los dummies de `test_rate_base.py` son los únicos ejercitantes de
   `VectorRateBase`, así que su contrato está verificado en runtime pero
   no estáticamente. Contra el principio 7 (todo claim declarado se
-  verifica automáticamente). **Dirección propuesta**: `strict = true`
-  global + override `[[tool.mypy.overrides]] module = "tests.*"` que
-  afloje lo legítimamente sucio de los tests (`disallow_untyped_defs =
-  false` como mínimo), mismo comando en `pre-commit` y en CI. Abierto:
-  qué más aflojar sin volver el chequeo decorativo. *(2026-08-14)*
+  verifica automáticamente). **Mecanismo cerrado (2026-08-17)**: `files =
+  ["src/fluidnet", "tests"]` + `namespace_packages = true` +
+  `explicit_package_bases = true` (`tests/` no tiene `__init__.py`), en
+  vez de `packages`/`modules` — son mutuamente excluyentes en mypy.
+  Descartadas: override por archivo (no matchea sin `__init__.py`) y
+  override laxo `tests.*` (no resuelve nada: los ~19 errores que aparecen
+  al activar el scope son todos `arg-type`/`union-attr`/`operator`, no
+  `disallow_untyped_defs`). Se resuelven con `# type: ignore[código]`
+  puntual siguiendo la convención ya usada en el repo (`test_rate_algebra.py`,
+  `test_single_phase_fluids.py`), más 2-3 narrowings por `isinstance`.
+  **Abierto**: aplicar el cambio de config y resolver los ~19 errores —
+  no entró en la sesión de infraestructura. *(2026-08-14, mecanismo
+  cerrado 2026-08-17)*
 - **Rate variable en `x` (black-oil).** El hoisting de
   `as_physics_kwargs()` fuera del `solve_ivp` (#22) se licencia en que el
   mass rate es constante a lo largo del eje. En black-oil el gas sale de
@@ -794,3 +804,30 @@ circuitos cerrados: hidráulica de edificios, procesos con recirculación.
   `Q ∝ √dp`) que compare el resultado del root-find contra la fórmula
   cerrada. Entra en la sesión de implementación de `LossFunc`, no espera a
   v1.0. *(2026-08-17)*
+- **Reglas de `[tool.mypy]` y `[tool.importlinter]` generadas con
+  asistencia.** Nadie las revisó línea por línea contra la arquitectura
+  buscada — hay que entenderlas y validar que el contrato de capas
+  represente la intención, no lo que salió por default. Precondición para
+  poder defenderlas en el paper. *(2026-08-17)*
+- **El contrato de capas de `import-linter` hoy es casi vacío.** `solvers`,
+  `network` y `losses` no existen todavía como paquetes; los paréntesis en
+  el contrato los marcan opcionales, así que `lint-imports` pasa porque no
+  hay nada que pueda violarlo. Es un contrato preventivo, no una
+  verificación real — no vender "arquitectura enforced" en el paper hasta
+  que esas capas existan. *(2026-08-17)*
+- **`pandas` y `networkx` en el contrato `forbidden` de `import-linter`.**
+  Cuestionado su valor real: hoy no verifican nada porque `physics`/`state`
+  no los importan. Se mantiene como tripwire y como versión ejecutable del
+  claim "capa cero agnóstica de red e I/O" (`VISION.md` §3.3) — revisable
+  si en algún momento estorba más de lo que documenta. *(2026-08-17)*
+- **README — reescritura completa, prioridad alta.** El actual declara
+  features que no existen (`network`, propagación de heads,
+  single-inflow/outflow — del prototipo viejo) y se autodeclaraba
+  "autogenerado" (ya retirado, ver `docs/session-log.md` 2026-08-17).
+  `dev` es el branch default: está en vivo ahora, no hay un "después"
+  donde se corrige. Prioridad por encima de `CONTRIBUTING.md` para el
+  objetivo de visibilidad. *(2026-08-17)*
+- **`CONTRIBUTING.md`.** Obligatorio para el submit a JOSS (community
+  guidelines: cómo contribuir, reportar, pedir ayuda), no urgente hasta
+  entonces. Al redactarlo, el diagrama de capas debe copiarse del
+  contrato de `import-linter`, no inventarse de nuevo. *(2026-08-17)*

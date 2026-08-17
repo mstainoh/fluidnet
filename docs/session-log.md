@@ -25,6 +25,90 @@
 
 ---
 
+## 2026-08-17 — código: infraestructura de repositorio
+
+**Cerrado:**
+
+- `.github/workflows/checks.yml`: matrix 3.10/3.12, `permissions: contents:
+  read`, `concurrency` con `cancel-in-progress`, `pip install -e ".[dev]"`,
+  guard `python -c "import fluids"`, `pre-commit run --all-files` (ruff
+  pineado + `lint-imports`), `python -m mypy`, `pytest --cov` (baseline
+  95%). Pusheado y corriendo.
+- Classifier de Python 3.11 retirado de `pyproject.toml` (declaraba soporte
+  que nadie verificaba); matriz de CI queda 3.10/3.12.
+- `ruff==0.16.0` pineado en `[dev]`, alineado con el `rev` del hook de
+  `.pre-commit-config.yaml` (ver `ROADMAP.md` §Decisiones/Cerradas).
+- `CITATION.cff` con ORCID `0000-0001-5088-800X`. Sin DOI hasta el primer
+  release.
+- `CODE_OF_CONDUCT.md` (Contributor Covenant 2.1), contacto de enforcement
+  fijado.
+- Zenodo habilitado sobre el repo.
+- README: sacada la nota "autogenerado" y la sección `## Features`
+  (declaraba capacidades del prototipo viejo — `network`, propagación de
+  heads, single-inflow/outflow — inexistentes en `0.2.0.dev0`); badge de
+  `checks.yml` agregado.
+- `pandas` se había sacado de `dependencies` por no tener consumidor en
+  `src/` todavía; revertido en la misma sesión — se usa en postproceso de
+  red, queda como dependencia core (`CLAUDE.md` #12 sigue vigente, sin
+  cambios).
+
+**Abierto** (backlog, no tocado esta sesión — ver también `ROADMAP.md`
+§Abiertas):
+
+- **CI está rojo**: 8 errores de mypy que no reproducen en local
+  (Windows/3.12) y sí en CI (Ubuntu/3.10+3.12) — divergencia de entorno,
+  señal real, no ruido. Plan para la próxima sesión, orden obligatorio
+  (pinear antes de corregir):
+  1. Pinear `mypy` (evaluar también `numpy`) en `[dev]` a la versión
+     exacta que resuelve CI — sacarla del step de install del log de
+     Actions. Reinstalar local y reproducir los 8 errores antes de tocar
+     código.
+  2. `unused-ignore` — `z_factor.py:86,154`: borrar los
+     `# type: ignore[arg-type]` sobre `newton`, innecesarios con los
+     stubs nuevos de scipy. Mecánico.
+  3. `no-any-return` — `friction.py:32`, `dimensionless.py:51`,
+     `state/fluids/gas.py:60,218`: envolver en `cast(ArrayLike, ...)`,
+     patrón ya usado en `z_factor.py`. Mecánico.
+  4. `type-arg` — `beggs_brill.py:24,64`: decisión de firma, no mecánico.
+     `beggs_brill_flowmap` anotado `int | np.ndarray` sin genérico;
+     `ArrayLike` no sirve (es `float64`, el regime es índice entero).
+     Candidato: `int | npt.NDArray[np.int_]`, verificando que
+     `m1*1 + m2*2 + m3*3` no promocione a `float`. Cerrar la firma antes
+     de pasarlo a Code.
+  5. **Verificar verde en Actions**, no solo localmente: los cuatro checks
+     (pre-commit, mypy, pytest, guard de `fluids`) tienen que pasar en
+     **ambos jobs de la matriz** (3.10 y 3.12), no alcanza con uno. Si
+     3.12 pasa y 3.10 falla (o viceversa), es un hallazgo real de
+     compatibilidad de versión — no ruido — y ahí hay algo que decidir,
+     no solo un CI a reparar.
+- Scope de mypy sobre `tests/` — mecanismo ya cerrado (`files` +
+  `namespace_packages` + `explicit_package_bases`, ver `ROADMAP.md`
+  §Abiertas), implementación pendiente.
+- Revisar y reescribir en tono propio `[tool.mypy]`/`[tool.importlinter]` —
+  precondición para poder defenderlas en el paper.
+- README: reescritura completa (prioridad alta, por encima de
+  `CONTRIBUTING.md` — `dev` es branch default, está en vivo ahora, no hay
+  un "después" donde se corrige).
+- `CONTRIBUTING.md`: obligatorio para JOSS, no urgente hasta el submit; el
+  diagrama de capas debe copiarse del contrato de `import-linter`, no
+  inventarse.
+- `pandas`/`networkx` en el contrato `forbidden` de `import-linter`:
+  cuestionado su valor — hoy no verifican nada porque `physics`/`state` no
+  los importan. Se mantiene como tripwire, revisable.
+- El contrato de capas de `import-linter` es hoy casi vacío: `solvers`,
+  `network`, `losses` no existen como paquetes, así que `lint-imports`
+  pasa por no haber nada que pueda violarlo. No vender "arquitectura
+  enforced" en el paper hasta que esas capas existan.
+- El tag de release va sobre `main`, que todavía no existe — "crear `main`
+  desde `dev`" es parte del checklist de release, no del día del tag.
+
+**Próximo paso:**
+
+- Ítem 2 del ROADMAP: diseño del caso demo. Ancla además el diseño de
+  `Result`, que queda como sesión en paralelo.
+
+---
+
 ## 2026-08-14 — código: `BaseRate` → ABC (`ScalarRateBase`/`VectorRateBase`, #35–#37)
 
 **Cerrado:**
