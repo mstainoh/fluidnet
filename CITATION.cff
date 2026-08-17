@@ -16,6 +16,7 @@ authors:
 repository-code: "https://github.com/mstainoh/fluidnet"
 url: "https://github.com/mstainoh/fluidnet"
 license: MIT
+version: 0.2.0.dev0
 keywords:
   - fluid-networks
   - hydraulics
