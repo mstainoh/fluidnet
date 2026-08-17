@@ -546,6 +546,116 @@ Rate ──► composición (intensiva)
     en toda la jerarquía (`ScalarRateBase` y `VectorRateBase` reciben y
     devuelven el mismo tipo de `value`, un `ArrayLike`), sin rama especial
     para el caso multi-cantidad.
+38. **`LossFunc` es una instancia, y es stateless respecto del eje.** El
+    constructor lleva **únicamente política numérica**: `gradient_fn`,
+    `detailed_fn`, método de root-find, tolerancias, parámetros de
+    `solve_ivp`, grilla de diagnóstico. Los **datos de eje** (`D`, `L`,
+    rugosidad, inclinación, `K`) llegan siempre como argumentos de llamada,
+    nunca como estado de constructor. Consecuencia directa: una sola
+    instancia es reutilizable en todos los ejes y puede vivir como atributo
+    de red, con override por eje vía el mismo mecanismo ya usado para el
+    fluido (`G.edges[u, v].get('loss', network.loss)`) — sin mecanismo
+    nuevo. Una instancia por eje sigue siendo legítima, pero como diferencia
+    de **política** (otra tolerancia, otra correlación), jamás de datos.
+    Razón fuerte: el fitting de v0.5 varía parámetros de eje (rugosidad,
+    diámetro efectivo); si esos datos vivieran en la instancia, el optimizer
+    tendría que clonar `LossFunc` por evaluación y por eje, o mutar un
+    objeto compartido entre ejes dentro del loop del optimizer.
+    *(2026-08-17)*
+39. **Los dos protocolos de loss difieren en el momento de binding del
+    estado.** No es una diferencia de convención sino de lifecycle:
+    `AlgebraicLoss` recibe un `State` **ya evaluado** (el solver bindea y
+    evalúa una vez, fuera de la loss) y no tiene presión en la firma — que
+    es literalmente su definición. `IntegralLoss` recibe el
+    `BoundStateModel` **sin evaluar** más `p_boundary`, y lo evalúa dentro
+    del `rhs` en cada paso. Cae solo del discriminante ya cerrado (#7, el
+    `StateModel` declara el régimen): el régimen *es* cuándo se puede
+    evaluar el estado — un fluido incompresible se evalúa antes de conocer
+    `P`, uno compresible no. Si ambos protocolos recibieran el
+    `BoundStateModel`, la loss algebraica tendría que invocarlo con un
+    `across` de mentira, que es API que le miente al usuario.
+    *(2026-08-17)*
+40. **`solve_rate` tiene default funcional, no `NotImplementedError`.**
+    Revierte el default de la decisión del 2026-08-09. Razón: en un DAG con
+    BC en nodos intermedios (v1.0) la formulación es necesariamente nodal —
+    la formulación por caudales (mesh/Hardy Cross) requiere ciclos
+    independientes como base, y en un DAG no hay ninguno. O sea que
+    `Q = f(P_up, P_down)` no es un extra de otros dominios: **es el corazón
+    del solver 2**, y un `NotImplementedError` heredado rompería
+    `mass_balance` para toda loss escrita por un usuario.
+    Semántica del default: *"si querés, dame la inversa explícita; si no, te
+    la armo yo"*. Se expone vía `solve_rate_is_defaulted` — **property de
+    solo lectura**, sin setter — más un `log.info` al construir. Aparece en
+    el `repr` y `Result` puede reportarlo como metadata del solve. Si el
+    usuario provee una inversa que no cierra, es problema del usuario: la
+    librería no valida física ajena (coherente con "ningún solver adivina",
+    ADR §2.4). *(2026-08-17)*
+41. **Root-find de `solve_rate`: elegible, default bracketed (`brentq`).**
+    Newton disponible como opción. Razones del default:
+    (a) un extremo del bracket es **gratis por física** — `Q = 0` da
+    `dp = 0` y, con constitutiva monótona, el signo del residual ahí es
+    conocido siempre; solo hay que expandir el otro extremo hasta cambio de
+    signo, sin tuning ni input del usuario;
+    (b) monotonía **no** garantiza convergencia global de Newton (hace falta
+    además condición de convexidad), y hay un modo de falla concreto: en
+    régimen turbulento `dp ~ Q²`, así que `d(dp)/dQ → 0` cuando `Q → 0` —
+    Newton arrancando de caudal chico divide por derivada casi nula, y ése
+    es el arranque natural de un solver sin estimación previa;
+    (c) en régimen integral la derivada numérica cuesta **una integración de
+    ODE completa extra por iteración**; Newton hace menos iteraciones pero
+    cada una cuesta el doble, y el balance se mide en v0.5, no se afirma
+    ahora.
+    Un default que puede explotar en el caso de arranque más común es mal
+    default aunque sea el más rápido cuando anda. Nota para el paper: la
+    unicidad que sostiene el solver de red (content de Millar) es la misma
+    que hace la inversión por eje incondicionalmente convergente.
+    Corolario habilitado por #38: una loss concreta con inversa analítica
+    (Darcy: `Q ∝ √dp`) sobrescribe `solve_rate` y no usa root-find alguno.
+    *(2026-08-17)*
+42. **`EdgeResult` y `Result` son contratos distintos.** `EdgeResult` es la
+    salida de `solve_dp`/`solve_rate`: envuelve el `sol` de `solve_ivp` más
+    properties chicas (`p_in`, `p_out`, `dp`, `rate`). `Result` es la salida
+    del **solver de red**. En el caso algebraico `EdgeResult.sol is None` —
+    no hay ODE y no hay nada que guardar. El objeto es "el estado resuelto
+    de un eje", no "el resultado de la ODE": con esa definición el
+    algebraico es el degenerado natural en vez de un caso raro, mismo
+    criterio que ya fija los dos protocolos. *(2026-08-17)*
+43. **`Result` es una red gemela de `nx.DiGraph`** (o wrapper sobre ella),
+    con los resultados como atributos de nodo y eje — no el dataclass frozen
+    que describía el ADR. Reutiliza el acceso diccionario-like nativo de
+    networkx, `to_frames()` ya está portado de mineplanner, y la
+    vectorización de v0.5 entra sin tocar nada (los dicts de networkx
+    guardan arrays igual que floats). **Forma cerrada, implementación
+    diferida**: no bloquea `LossFunc`/`EdgeResult`. Consecuencia sobre el
+    ADR §2.5: la promesa "consumible sin exigir que el consumidor conozca
+    networkx" se restringe a las vistas — `to_frames()` es la interfaz
+    pública, el grafo es detalle de implementación. *(2026-08-17)*
+44. **`diagnose()`: índice `(edge, x)`, esquema abierto.** Cierra el ítem
+    abierto desde 2026-08-10. El output es el de salida de la `detailed_fn`
+    tal cual — no se inventa estructura. Un `dict` por punto de evaluación,
+    con índice `(edge, x)` y `x = NaN` en el caso algebraico (no `None`:
+    `NaN` significa lo mismo — no hubo integración, no hay coordenada — y no
+    rompe `.loc` sobre el nivel del `MultiIndex`). Trivialmente convertible
+    a `DataFrame`. **Los campos los elige el autor de la `detailed_fn`, no
+    el usuario final** — es esquema abierto, no configurable; el usuario
+    elige la loss, y el filtrado de columnas lo hace pandas
+    (`df[['f', 'Re']]`), no un parámetro de la API. Una lista de nombres
+    habría obligado a `detailed_fn` a declarar y validar su vocabulario por
+    adelantado, infraestructura para resolver algo que pandas ya resuelve.
+    **Columnas ragged son comportamiento declarado**: si dos ejes usan
+    losses distintas (que #38 permite explícitamente), sus `detailed_fn`
+    devuelven campos distintos y el `DataFrame` concatenado da unión de
+    columnas con `NaN`. Es correcto, y hay que documentarlo o el primer
+    usuario que mezcle correlaciones lo va a leer como bug. *(2026-08-17)*
+45. **Grilla de diagnóstico: `t_eval` relativo, `dense_output` descartado.**
+    `dense_output=True` es interpolación cara para una grilla que se puede
+    declarar de antemano; `t_eval` **es** la grilla declarada de la decisión
+    del 2026-08-10. Va como parámetro opcional de la instancia
+    (`EdgeResult.sol` queda poblado sólo si se pidió). **Tiene que ser
+    relativo** — un `int` (n puntos equiespaciados) o un array normalizado
+    en `[0, 1]` — y la loss arma `t_eval = grid * L` en cada llamada: `L`
+    cambia por eje, así que una grilla absoluta en metros metería estado de
+    eje en el constructor y rompería #38. *(2026-08-17)*
 
 ## Convenciones de testing (capa physics)
 

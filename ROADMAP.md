@@ -429,8 +429,14 @@ circuitos cerrados: hidráulica de edificios, procesos con recirculación.
 2. **Diseño del caso demo** — red sintética de wellfield: inputs, outputs, qué
    muestra el notebook. Define los tests de aceptación y tensiona las firmas de
    `Rate`/`Fluid` contra un uso real. Sin código.
-3. **Firmas públicas restantes** — los dos `Protocol` de loss y `Result`, a
-   nivel de interfaz (docstrings + type hints), no implementación.
+3. ~~**Firmas públicas restantes** — los dos `Protocol` de loss y `Result`~~ —
+   **cerrado a nivel de contrato (2026-08-17)**: `LossFunc` como instancia
+   stateless, split de binding entre los dos protocolos, `solve_rate` con
+   default bracketed, `EdgeResult` con `sol=None` en algebraico, `diagnose()`
+   con índice `(edge, x)` y esquema abierto. Ver `CLAUDE.md` #38–#45.
+   Falta la **implementación** de `LossFunc` + `EdgeResult` (próxima sesión de
+   código, junto con la de infraestructura). `Result` (red gemela) queda
+   diferido con forma decidida — no bloquea.
 4. ~~Mecanismo de `@diagnostic`~~ — **cerrado (2026-08-10), ya no bloquea.**
    `darcy_weisbach` se implementa sin él.
 5. **Implementar** por piezas chicas siguiendo el mapa de rescate del ADR §3,
@@ -578,6 +584,36 @@ circuitos cerrados: hidráulica de edificios, procesos con recirculación.
   `TypeVar`. `state/__init__.py` tenía el import viejo (`BoundState`) sin
   actualizar tras el rename — eso rompía el import de todo
   `fluidnet.state.fluids`, corregido en la misma pasada.
+- **Contrato de `LossFunc` cerrado (2026-08-17).** `LossFunc` es una
+  instancia stateless respecto del eje (política numérica en el
+  constructor, datos de eje como argumentos) — reutilizable en toda la red,
+  con override por eje vía `G.edges[u, v].get('loss', network.loss)`. Los
+  dos protocolos difieren en el **momento de binding del estado**:
+  `AlgebraicLoss` recibe un `State` ya evaluado, `IntegralLoss` recibe el
+  `BoundStateModel` sin evaluar más `p_boundary`. Ver `CLAUDE.md` #38–#39.
+- **`solve_rate` con default funcional, root-find elegible, default
+  bracketed (2026-08-17).** Revierte el `NotImplementedError` del
+  2026-08-09: en un DAG con BC en nodos intermedios la formulación es
+  necesariamente nodal, así que `solve_rate` es el corazón del solver 2 y no
+  un extra de otros dominios. `solve_rate_is_defaulted` como property de
+  solo lectura + `log.info`. `brentq` por default (un extremo del bracket es
+  gratis por física; Newton no converge globalmente sólo por monotonía y
+  falla con `d(dp)/dQ → 0` en turbulento). Ver `CLAUDE.md` #40–#41.
+- **`EdgeResult` separado de `Result`; `Result` es red gemela
+  (2026-08-17).** `EdgeResult` = estado resuelto de un eje (`sol` de
+  `solve_ivp` + `p_in`/`p_out`/`dp`/`rate`), con `sol is None` en el caso
+  algebraico. `Result` = red gemela de `nx.DiGraph` con resultados como
+  atributos de nodo y eje, reemplazando el dataclass frozen del ADR §2.5.
+  Forma cerrada, implementación diferida. Ver `CLAUDE.md` #42–#43.
+- **`diagnose()`: índice `(edge, x)`, esquema abierto, `t_eval` relativo
+  (2026-08-17).** ← cierra el ítem abierto desde 2026-08-10. El output es el
+  de la `detailed_fn` tal cual; los campos los elige el autor de la loss, no
+  el usuario final; el filtrado lo hace pandas. `x = NaN` en algebraico.
+  Columnas ragged entre ejes con losses distintas son comportamiento
+  declarado. `dense_output` descartado a favor de `t_eval` relativo
+  (normalizado en `[0, 1]` o `int`, escalado por `L` en cada llamada — una
+  grilla absoluta rompería la invariante stateless de #38). Ver `CLAUDE.md`
+  #44–#45.
 
 ### Abiertas
 
@@ -619,12 +655,6 @@ circuitos cerrados: hidráulica de edificios, procesos con recirculación.
   hace el lazo barato: no hay caché que invalidar entre iteraciones.
   **Abierto**: criterio de corte; y si en v2.0 la inversión de sentido de flujo
   en loops requiere regularización o basta con detectarla y abortar.
-- **Firma concreta de `diagnose()` y de la declaración de grilla.** Cerrado el
-  mecanismo, falta la interfaz: cómo el usuario dice *qué* quiere ver (holdup,
-  velocidad, régimen) y *dónde* (extremos, todos los `sol.t`, k puntos
-  equiespaciados). Sub-pregunta: si la selección de variables es por lista de
-  nombres o si se entrega el registro completo y filtra el consumidor. Diseño
-  de v0.5, no bloquea v0.2.
 - **Guard de Mach / `Ek → 1`.** Verificado 2026-08-10: `single_phase_gradient`
   y `beggs_brill_gradient` ya levantan `ValueError("Supersonic flow
   encountered")` en `eh >= 1`, con `warnings.warn` en `eh > 0.9` como banda de
@@ -747,3 +777,20 @@ circuitos cerrados: hidráulica de edificios, procesos con recirculación.
   afirmación de diseño sin firma ni consumidor) o el `State` emite ya los
   rates por fase. Conecta con la entrada de composición en
   `VectorRateBase`. *(2026-08-14)*
+- **Índice de `diagnose()` en v0.5: `(edge, x)` es el degenerado de
+  `(edge, x, escenario)`.** Con vectorización por escenarios cada campo de
+  `_detailed` deja de ser escalar y pasa a ser array sobre el eje de
+  escenario; un índice `(edge, x)` con celdas-array no es un `DataFrame`
+  usable, y el formato long real es de tres niveles. El índice cerrado en
+  `CLAUDE.md` #44 es correcto para v0.2 (escalar por definición) y se
+  registra explícitamente **como caso degenerado, no como forma final** —
+  mismo patrón que `Fluid` de red → nodo. Si no queda escrito, en v0.5 se
+  lee como rediseño en vez de generalización. *(2026-08-17)*
+- **Verificación del default de `solve_rate`.** El default por root-find
+  (`CLAUDE.md` #40–#41) no tiene consumidor hasta el solver 2 (v1.0), o sea
+  que hoy sería un claim declarado sin verificar — contra el principio 7.
+  Se cierra barato y desde ahora: un test contra una loss con inversa
+  analítica conocida (`constant_friction`, o `darcy_weisbach` con
+  `Q ∝ √dp`) que compare el resultado del root-find contra la fórmula
+  cerrada. Entra en la sesión de implementación de `LossFunc`, no espera a
+  v1.0. *(2026-08-17)*

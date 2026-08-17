@@ -1669,3 +1669,65 @@ no pierde precisión, así que no bloquea v0.2.
   (matriz 3.10/3.12), `CONTRIBUTING.md`, `CITATION.cff` + Zenodo.
 - Después: sesión de diseño de `Result` + firmas de `LossFunc` + caso
   demo.
+
+---
+
+## 2026-08-17 — diseño
+
+**Cerrado:**
+
+- **`LossFunc` es una instancia stateless respecto del eje** (`CLAUDE.md`
+  #38). Constructor = política numérica; datos de eje = argumentos.
+  Reutilizable en toda la red como atributo, con override por eje vía el
+  mismo mecanismo del fluido. Razón fuerte: el fitting de v0.5 varía
+  parámetros de eje, y con datos en la instancia el optimizer tendría que
+  clonar o mutar un objeto compartido.
+- **Los dos protocolos de loss difieren en el momento de binding del
+  estado** (#39): `AlgebraicLoss` recibe `State` ya evaluado y sin presión
+  en la firma; `IntegralLoss` recibe `BoundStateModel` sin evaluar más
+  `p_boundary`. Cae del discriminante ya cerrado — el régimen *es* cuándo se
+  puede evaluar el estado.
+- **`solve_rate` con default funcional** (#40), revirtiendo el
+  `NotImplementedError` del 2026-08-09. En un DAG con BC en nodos
+  intermedios la formulación es necesariamente nodal (no hay ciclos
+  independientes para Hardy Cross), así que `solve_rate` es el corazón del
+  solver 2. `solve_rate_is_defaulted` property de solo lectura + `log.info`.
+- **Root-find elegible, default bracketed** (#41). Newton descartado como
+  default: monotonía sola no da convergencia global, `d(dp)/dQ → 0` en
+  turbulento es modo de falla en el arranque natural, y en régimen integral
+  la derivada numérica cuesta una ODE completa por iteración. El extremo
+  `Q = 0` del bracket es gratis por física.
+- **`EdgeResult` separado de `Result`** (#42), con `sol is None` en el caso
+  algebraico. Definido como "estado resuelto de un eje", no "resultado de la
+  ODE" — así el algebraico es el degenerado natural.
+- **`Result` es red gemela de `nx.DiGraph`** (#43), no dataclass frozen.
+  Forma cerrada, implementación diferida.
+- **`diagnose()`: índice `(edge, x)`, esquema abierto** (#44) ← cierra el
+  ítem abierto desde 2026-08-10. Output de la `detailed_fn` tal cual; campos
+  elegidos por el autor de la loss, filtrado por pandas; `x = NaN` en
+  algebraico; columnas ragged declaradas como comportamiento correcto.
+- **`t_eval` relativo, `dense_output` descartado** (#45). La grilla va
+  normalizada en `[0, 1]` o como `int`, escalada por `L` en cada llamada —
+  una grilla absoluta metería estado de eje en el constructor y rompería
+  #38.
+- **Deuda del ADR §2.2 identificada y corregida**: firmas con `Fluid` en vez
+  de `State`/`BoundStateModel`, retorno `-> float` en vez de `ArrayLike`, y
+  el bloque de `@diagnostic` como decorador describiendo un mecanismo ya
+  muerto desde el 2026-08-10.
+
+**Abierto** → `ROADMAP §Abiertas`: índice de `diagnose()` en v0.5 como
+`(edge, x, escenario)` — el índice cerrado hoy es su degenerado, no la forma
+final; verificación del default de `solve_rate` (test contra una loss con
+inversa analítica, entra en la sesión de implementación).
+
+**No se hizo:** sesión de infraestructura de repositorio (CI, `CONTRIBUTING`,
+`CITATION.cff`, Zenodo) — diferida por decisión del operador, sin blockers
+nuevos. Los cuatro blockers previos siguen igual, salvo el de `fluids`, que se
+verificó **no ser blocker**: ya está en `[dev]` sin condicional, así que un CI
+que instale `.[dev]` no puede saltear los tests de cross-validation en
+silencio.
+
+**Próximo paso:**
+
+- Sesión de código combinada: infraestructura de repositorio + implementación
+  de `LossFunc` y `EdgeResult` contra las decisiones #38–#45.

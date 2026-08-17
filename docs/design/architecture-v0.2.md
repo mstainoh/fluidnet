@@ -367,16 +367,30 @@ El código de mineplanner ya reveló que hay dos firmas distintas según el rég
 **Protocolo algebraico** (monofásico, incompresible — el dp no depende de la presión absoluta):
 
 ```
-loss_func(rate: Rate, fluid: Fluid, **edge_attrs, **network_attrs) -> float
+AlgebraicLoss.solve_dp(*, rate: Rate, state: State, **edge_attrs) -> ArrayLike
 ```
 
 **Protocolo de integración** (multifásico / compresible — el dp depende de p local, se integra dp/dL desde la frontera conocida):
 
 ```
-loss_func(rate: Rate, fluid: Fluid, p_boundary: float, **edge_attrs, **network_attrs) -> float
+IntegralLoss.solve_dp(*, rate: Rate, state: BoundStateModel,
+                      p_boundary: ArrayLike, **edge_attrs) -> EdgeResult
 ```
 
 Ambos declarados como `typing.Protocol` explícitos (`AlgebraicLoss`, `IntegralLoss`). Convención de signos heredada y confirmada: `dp = p_downstream − p_upstream` (pérdida → negativo). Kwargs extra absorbidos con `**kwargs` — el patrón de mineplanner de "declarar solo lo que usás" funciona bien y se mantiene.
+
+**Tres correcciones sobre la versión previa de esta sección** *(2026-08-17)*.
+(a) La firma anota `State`/`BoundStateModel`, **no `Fluid`**: el `StateModel` es
+el protocolo neutro y `Fluid` una implementación suya; anotar `Fluid` rompería
+la arquitectura physics-agnostic en la firma misma — el demo eléctrico AC de
+v2.0 no podría tipar. (b) El retorno es `ArrayLike`, **no `float`**: mismo caso
+exacto que la corrección `FluidState: float → ArrayLike` del 2026-08-13, y
+requisito de la vectorización por escenarios de v0.5. (c) La diferencia entre
+los dos protocolos **es el momento de binding del estado** (`CLAUDE.md` #39):
+el algebraico recibe un estado ya evaluado y no tiene presión en la firma; el
+integral recibe el modelo ligado sin evaluar y lo evalúa en cada paso del
+`rhs`. Si ambos recibieran el `BoundStateModel`, la loss algebraica tendría que
+invocarlo con un `across` de mentira.
 
 Consecuencia directa de que `physics/` sea enteramente keyword-only (`CLAUDE.md` decisión #15): `loss_func` puede despachar hacia la función de gradiente correcta filtrando sus propios kwargs por `inspect.signature(gradient_fn).parameters` en vez de necesitar un adaptador por modelo. `physics` tampoco conoce la orientación del edge — es `loss_func` quien adapta signo/dirección (caudal, inclinación) antes de invocar la función de gradiente; la dirección de integración en sí la resuelve el solver (`t_span` de `solve_ivp`), no `physics` ni `loss_func`.
 
@@ -384,11 +398,27 @@ Consecuencia directa de que `physics/` sea enteramente keyword-only (`CLAUDE.md`
 
 La salida no es que lo declare el usuario al registrar la loss ni que lo chequee el solver: **es una propiedad del `Fluid`**. El `Fluid` es dueño del EOS, así que es el único que sabe si `∂ρ/∂P = 0`. Un fluido incompresible expone propiedades sin necesitar `P` y por lo tanto es compatible con `AlgebraicLoss`; un fluido compresible exige `P` y solo es compatible con `IntegralLoss`. La `loss_func` hereda el régimen del fluido que recibe. Es coherente con "ningún solver adivina" (§2.4) y con que `compressibility` sea estado y no flag.
 
-**Diagnósticos vía decorador** — la solución al conflicto "contrato escalar estricto vs. resultado rico":
+**Diagnósticos: no hay decorador.** *(Corrección 2026-08-17; este bloque
+describía un mecanismo ya muerto.)* El `@diagnostic` como decorador con canal
+lateral quedó obsoleto en dos pasos: el 2026-08-10 el mecanismo pasó a ser
+**post-proceso sobre la solución convergida** (ni contextvar ni colector
+durante el solve), y el 2026-08-17 `LossFunc` quedó cerrado como **instancia**
+(`CLAUDE.md` #38) — no se decora un método abstracto de un `Protocol` y se
+espera que el registro lateral funcione igual.
 
-- El protocolo exige `-> float`. Punto. Tipado estricto, usuario casual escribe 5 líneas.
-- Un decorador `@diagnostic` permite a la función registrar intermedios (f, Re, v, régimen de flujo, perfil P(x)) en un canal lateral que **el solver** recolecta cuando se pide `full_output=True`. La loss function nunca devuelve un dict al solver.
-- El `full_output: bool` de `darcy_dp` actual desaparece de la firma pública (queda como mecanismo interno del decorador).
+Lo que queda: `detailed_fn` es un **argumento del constructor** de la
+instancia de loss, declarado explícito, nunca descubierto por convención de
+nombre (`_*_detailed`). `diagnose()` se corre después de converger, replayeando
+`detailed_fn` sobre el `P(x)` ya integrado en la grilla declarada por `t_eval`.
+El overhead es chico y la alternativa no aporta información: no hace falta el
+régimen de flujo en mil puntos por eje — si se quiere esa resolución, se declara
+la grilla y se paga explícitamente. Durante el fitting el costo de diagnóstico
+es cero, que era el argumento original a favor del post-proceso.
+
+Output: el de la `detailed_fn` tal cual, con índice `(edge, x)` y esquema
+abierto (`CLAUDE.md` #44). El `full_output: bool` de `darcy_dp` desaparece de
+la firma pública igual, pero porque `EdgeResult` ya lo hace innecesario, no
+porque lo absorba un decorador.
 
 Built-ins v0.2: `constant_friction` (baseline trivial, para tests y docs) y `darcy_weisbach` (portado de `pressure_functions.py`, que ya está en buen estado: Chen approx, régimen laminar/transición/turbulento, minor losses K, vectorizado numpy). `darcy_weisbach` obtiene las propiedades pidiéndole el `FluidState` al `Fluid`, no leyéndolas del `Rate` ni de la red.
 
@@ -402,11 +432,30 @@ ejes ortogonales reales son el régimen (algebraico/integral, declarado por el
 `StateModel`) y cuál es la incógnita (`dp` o `rate`); el segundo es común a
 ambos regímenes, así que vive en el contrato base y no duplica la matriz.
 
-`solve_rate` se declara aunque no se implemente porque habilita resolver la
-red sobre un **campo de potenciales**. No es el régimen natural de los
-fluidos, pero sí el de otros dominios, y declararlo cuesta una línea.
-`NotImplementedError` en vez de un default por root-find evita imponerle un
-Newton heredado a toda loss que no lo necesite.
+**`solve_rate` tiene default funcional** *(corrección 2026-08-17; revierte el
+`NotImplementedError` de 2026-08-09)*. La justificación previa —"no es el
+régimen natural de los fluidos, pero sí el de otros dominios"— era falsa. Si
+`mass_balance` plantea incógnitas nodales de presión, cada eje tiene que
+entregar `Q = f(P_up, P_down)`: eso **es** `solve_rate`. Y no hay alternativa
+dentro del scope: la formulación por caudales (mesh/loop, Hardy Cross) necesita
+ciclos independientes como base, y en un DAG no hay ninguno — los caudales
+quedan determinados por las BC solas. Para redes con BC en nodos intermedios
+(v1.0) la formulación nodal no es una opción entre varias: es la única. Un
+`NotImplementedError` heredado rompería el solver 2 para toda loss escrita por
+un usuario.
+
+Semántica: *"si querés, dame la inversa explícita; si no, te la armo yo"*,
+expuesto vía `solve_rate_is_defaulted` (property de solo lectura) más un
+`log.info`. Default por root-find **bracketed** (`brentq`), con Newton
+elegible; razones en `CLAUDE.md` #41 — el extremo `Q = 0` del bracket es gratis
+por física, monotonía sola no da convergencia global de Newton, y
+`d(dp)/dQ → 0` en turbulento es el modo de falla concreto. Una loss con inversa
+analítica sobrescribe `solve_rate` y no usa root-find alguno.
+
+**Consecuencia sobre la anidación de métodos numéricos** (ROADMAP §Abiertas):
+`solve_rate` sobre `IntegralLoss` es ODE dentro de root-find dentro de
+root-find. Tres niveles, y a partir de esta corrección están en el camino a
+v1.0, no fuera de él.
 
 **Por qué se mantienen dos protocolos** si el algebraico es formalmente el
 caso degenerado del integral (sin `P` en el integrando, la integral colapsa a
@@ -463,7 +512,21 @@ El usuario elige el régimen; ningún solver "adivina":
 
 ### 2.5 Result — el contrato de salida
 
-Producido por el solver, nunca por loss functions. Dataclass frozen:
+**Corrección 2026-08-17**: `Result` **no es un dataclass frozen** — es una red
+gemela de `nx.DiGraph` (o un wrapper sobre ella) con los resultados como
+atributos de nodo y eje (`CLAUDE.md` #43). Reutiliza el acceso
+diccionario-like nativo de networkx, `to_frames()` ya está portado de
+mineplanner, y la vectorización de v0.5 entra sin tocar nada. Un `frozen=True`
+conteniendo un `nx.DiGraph` mutable daba inmutabilidad decorativa de todos
+modos. Consecuencia sobre la promesa de más abajo: "consumible sin exigir que
+el consumidor conozca networkx" se restringe a las **vistas** — `to_frames()`
+es la interfaz pública, el grafo es detalle de implementación.
+
+`Result` es distinto de `EdgeResult` (`CLAUDE.md` #42), que es la salida de
+`solve_dp`/`solve_rate`: estado resuelto de **un eje**, con el `sol` de
+`solve_ivp` (o `None` en el caso algebraico) más `p_in`/`p_out`/`dp`/`rate`.
+
+Producido por el solver, nunca por loss functions. Contenido:
 
 - **Garantizado siempre**: la terna completa `(rate, p_up, p_down)` por edge; `(rate, p)` por nodo; metadata del solve (régimen, convergencia, iteraciones).
 - **Opcional / lazy**: diagnósticos del decorador (f, Re, v por edge), perfil `P(x)` si el edge tiene planimetría (trayectoria 3D como atributo de edge), propiedades derivadas del `Fluid` en cada nodo (composición de mezcla, `FluidState` local, saturation indices vía extensión).
