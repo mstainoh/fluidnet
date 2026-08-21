@@ -21,7 +21,7 @@ from fluidnet.physics.types import GradientResult
 FLOW_REGIMES = ("segregated", "intermittent", "distributed", "transition")
 
 
-def beggs_brill_flowmap(Cl: ArrayLike, NFr: ArrayLike) -> int | np.ndarray:
+def beggs_brill_flowmap(Cl: ArrayLike, NFr: ArrayLike) -> int | np.ndarray[Any, np.dtype[np.int_]]:
     """Flow regime index from no-slip liquid fraction and Froude**2 number.
 
     Vectorized (uses boolean masks, no ``if``).
@@ -61,7 +61,7 @@ def beggs_brill_flowmap(Cl: ArrayLike, NFr: ArrayLike) -> int | np.ndarray:
         raise ValueError(
             f"invalid values for Cl {np.atleast_1d(Cl)[bad]} and NFr {{np.atleast_1d(NFr)[bad]}}"
         )
-    regime: int | np.ndarray = m1 * 1 + m2 * 2 + m3 * 3
+    regime: int | np.ndarray[Any, np.dtype[np.int_]] = m1 * 1 + m2 * 2 + m3 * 3
     return regime
 
 

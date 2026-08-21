@@ -1,5 +1,7 @@
 """Dimensionless numbers. Pure SI functions, numpy-vectorized."""
 
+from typing import cast
+
 import numpy as np
 import scipy.constants as spc
 
@@ -48,7 +50,7 @@ def froude(v: ArrayLike, D: ArrayLike) -> ArrayLike:
     ArrayLike
         Froude number (dimensionless).
     """
-    return v / np.sqrt(spc.g * D)
+    return cast(ArrayLike, v / np.sqrt(spc.g * D))
 
 
 def mach(

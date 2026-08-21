@@ -80,10 +80,7 @@ def z_hall_yarborough(
         )
 
     y0 = 0.0125 * pressure_reduced * t * np.exp(-1.2 * (1.0 - t) ** 2)
-    # scipy's stub overloads newton() for a strict (ndarray, /, *Any, **Any) -> ndarray
-    # signature; F/dF are ArrayLike (float | ndarray) in both directions, which is
-    # correct at runtime for both the scalar and vectorized code paths.
-    y = newton(F, y0, fprime=dF, tol=tol, maxiter=maxiter)  # type: ignore[arg-type]
+    y = newton(F, y0, fprime=dF, tol=tol, maxiter=maxiter)
     return cast(ArrayLike, X1 / y)
 
 
@@ -150,6 +147,5 @@ def z_dranchuk_abou_kassem(
         )
 
     Z0 = np.ones_like(Ppr * Tpr, dtype=float)
-    # See the analogous scipy stub-overload note in z_hall_yarborough.
-    Z = newton(f, Z0, tol=tol, maxiter=maxiter)  # type: ignore[arg-type]
+    Z = newton(f, Z0, tol=tol, maxiter=maxiter)
     return cast(ArrayLike, Z)

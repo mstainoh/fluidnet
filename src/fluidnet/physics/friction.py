@@ -6,6 +6,8 @@ swap that goes numerically unnoticed when roughness << diameter. Keyword-only
 arguments make that class of bug impossible.
 """
 
+from typing import cast
+
 import numpy as np
 
 from fluidnet._types import ArrayLike
@@ -29,13 +31,17 @@ def _chen_approx(re: ArrayLike, D: ArrayLike, eps: ArrayLike) -> ArrayLike:
         Fanning friction factor (turbulent correlation).
     """
     re = np.clip(re, 2e3, None)
-    return (
-        -4
-        * np.log10(
-            0.2698 * (eps / D)
-            - 5.0452 / re * np.log10(0.3539 * (eps / D) ** 1.1098 + 5.8506 / re**0.8981)
+    return cast(
+        ArrayLike,
+        (
+            -4
+            * np.log10(
+                0.2698 * (eps / D)
+                - 5.0452 / re * np.log10(0.3539 * (eps / D) ** 1.1098 + 5.8506 / re**0.8981)
+            )
         )
-    ) ** -2
+        ** -2,
+    )
 
 
 def friction_factor(

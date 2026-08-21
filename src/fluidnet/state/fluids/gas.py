@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from typing import cast
 
 import scipy.constants as spc
 
@@ -57,7 +58,7 @@ class IdealGas(CompressibleFluidBase):
         if temperature is None:
             raise ValueError("Temperature must be provided for ideal gas density calculation.")
         R_specific = spc.R / self.molecular_weight  # Specific gas constant
-        return pressure / (R_specific * temperature)
+        return cast(ArrayLike, pressure / (R_specific * temperature))
 
     def compressibility(
         self, *, pressure: ArrayLike, temperature: float | None = None
@@ -215,7 +216,7 @@ class RealGas(CompressibleFluidBase):
             raise ValueError("Temperature must be provided for real gas density calculation.")
         z = self.z(pressure=pressure, temperature=temperature)
         R_specific = spc.R / self.molecular_weight
-        return pressure / (z * R_specific * temperature)
+        return cast(ArrayLike, pressure / (z * R_specific * temperature))
 
     def compressibility(
         self, *, pressure: ArrayLike, temperature: float | None = None
