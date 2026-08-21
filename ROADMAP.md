@@ -623,6 +623,11 @@ circuitos cerrados: hidráulica de edificios, procesos con recirculación.
   personales fuera del repo; el racional en prosa va a
   `CONTRIBUTING.md` cuando CI esté verde. Precondición del paper JOSS:
   cumplida.
+- **`CONTRIBUTING.md` escrito y pusheado (2026-08-21).** Cierra el ítem
+  abierto desde 2026-08-17. El pilar 3 ("Architectural coherence") y la
+  sección "Current scope" copian el diagrama de capas del contrato real
+  verificado de `import-linter` (ítem anterior), no lo inventan de nuevo
+  — cumple la instrucción que dejó abierto el ítem original.
 
 ### Abiertas
 
@@ -834,10 +839,6 @@ circuitos cerrados: hidráulica de edificios, procesos con recirculación.
   `dev` es el branch default: está en vivo ahora, no hay un "después"
   donde se corrige. Prioridad por encima de `CONTRIBUTING.md` para el
   objetivo de visibilidad. *(2026-08-17)*
-- **`CONTRIBUTING.md`.** Obligatorio para el submit a JOSS (community
-  guidelines: cómo contribuir, reportar, pedir ayuda), no urgente hasta
-  entonces. Al redactarlo, el diagrama de capas debe copiarse del
-  contrato de `import-linter`, no inventarse de nuevo. *(2026-08-17)*
 - **`networkx` declarado como runtime dependency y no usado en `src/`.**
   Verificado 2026-08-21: cero imports de `networkx` en todo el paquete.
   Es un claim declarado sin verificar en el mismo `pyproject.toml` donde
