@@ -757,3 +757,14 @@ aplicá directo:
   código.
 - scipy: `ignore_missing_imports` vía override en `pyproject.toml`. No
   instalar `scipy-stubs`.
+
+## Atribución en commits
+
+```json
+{
+  "attribution": {
+    "commit": "Assisted-by: Claude Code <noreply@anthropic.com>",
+    "pr": ""
+  }
+}
+```
