@@ -616,6 +616,13 @@ circuitos cerrados: hidráulica de edificios, procesos con recirculación.
   `docs/session-log.md`, 2026-08-17). Regla general: toda herramienta que
   emite juicios sobre el código (linter, formatter, type checker) va
   pineada a versión exacta; el bump es explícito y ocupa un commit propio.
+- **Reglas de `[tool.mypy]` e `[tool.importlinter]` revisadas y
+  verificadas (2026-08-21).** Sesión de diseño dedicada a entender qué
+  chequea cada herramienta y validar los contratos contra la
+  arquitectura buscada, con probes ejecutados sobre el repo. Notas
+  personales fuera del repo; el racional en prosa va a
+  `CONTRIBUTING.md` cuando CI esté verde. Precondición del paper JOSS:
+  cumplida.
 
 ### Abiertas
 
@@ -804,17 +811,17 @@ circuitos cerrados: hidráulica de edificios, procesos con recirculación.
   `Q ∝ √dp`) que compare el resultado del root-find contra la fórmula
   cerrada. Entra en la sesión de implementación de `LossFunc`, no espera a
   v1.0. *(2026-08-17)*
-- **Reglas de `[tool.mypy]` y `[tool.importlinter]` generadas con
-  asistencia.** Nadie las revisó línea por línea contra la arquitectura
-  buscada — hay que entenderlas y validar que el contrato de capas
-  represente la intención, no lo que salió por default. Precondición para
-  poder defenderlas en el paper. *(2026-08-17)*
-- **El contrato de capas de `import-linter` hoy es casi vacío.** `solvers`,
-  `network` y `losses` no existen todavía como paquetes; los paréntesis en
-  el contrato los marcan opcionales, así que `lint-imports` pasa porque no
-  hay nada que pueda violarlo. Es un contrato preventivo, no una
-  verificación real — no vender "arquitectura enforced" en el paper hasta
-  que esas capas existan. *(2026-08-17)*
+- **Alcance real del contrato de capas de `import-linter` (verificado
+  2026-08-21).** La entrada anterior decía que el contrato era "casi
+  vacío"; es falso. `rate`, `state`, `physics` y `_types` existen y se
+  enforcan: inyectando violaciones a propósito, `layers` rompe con
+  `physics → rate`, `independence` rompe con `state → physics`, y
+  `forbidden` rompe con `physics → pandas`. `lint-imports` analiza 32
+  archivos y 82 dependencias. Lo que sigue siendo cierto es que la
+  jerarquía **completa** no está demostrada: `solvers`, `network` y
+  `losses` son opcionales en el contrato porque no existen todavía. Al
+  redactar el paper, el claim defendible es "las capas existentes están
+  verificadas", no "arquitectura enforced". *(2026-08-21)*
 - **`pandas` y `networkx` en el contrato `forbidden` de `import-linter`.**
   Cuestionado su valor real: hoy no verifican nada porque `physics`/`state`
   no los importan. Se mantiene como tripwire y como versión ejecutable del
@@ -831,3 +838,13 @@ circuitos cerrados: hidráulica de edificios, procesos con recirculación.
   guidelines: cómo contribuir, reportar, pedir ayuda), no urgente hasta
   entonces. Al redactarlo, el diagrama de capas debe copiarse del
   contrato de `import-linter`, no inventarse de nuevo. *(2026-08-17)*
+- **`networkx` declarado como runtime dependency y no usado en `src/`.**
+  Verificado 2026-08-21: cero imports de `networkx` en todo el paquete.
+  Es un claim declarado sin verificar en el mismo `pyproject.toml` donde
+  vive el principio 7. Se resuelve solo cuando `network/` exista (v0.2);
+  hasta entonces queda anotado, no removido — removerlo y volver a
+  agregarlo es churn. *(2026-08-21)*
+- **`pandas` está en el contrato `forbidden` pero no en `dependencies`.**
+  No rompe nada hoy. `to_frames()` (scope v0.2) lo vuelve runtime dep;
+  al agregarlo, verificar que el contrato `forbidden` siga siendo el
+  correcto (prohibirlo en capa cero sigue teniendo sentido). *(2026-08-21)*

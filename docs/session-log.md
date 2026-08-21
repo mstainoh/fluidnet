@@ -1815,3 +1815,46 @@ silencio.
 
 - Sesión de código combinada: infraestructura de repositorio + implementación
   de `LossFunc` y `EdgeResult` contra las decisiones #38–#45.
+
+---
+
+## 2026-08-21 — sesión de diseño: tooling de calidad
+
+**Cerrado:**
+
+- Lectura completa de las tres herramientas de calidad configuradas en el
+  repo (`ruff`, `mypy`, `import-linter`) para entender qué chequea cada
+  una, más allá de que estuvieran corriendo en CI.
+- Verificación por probes de los tres contratos declarados: violaciones
+  inyectadas a propósito para confirmar que `import-linter` efectivamente
+  rompe donde debería — `layers` con `physics → rate`, `independence` con
+  `state → physics`, `forbidden` con `physics → pandas`. `lint-imports`
+  analiza 32 archivos y 82 dependencias. Corrige la entrada previa de
+  `ROADMAP.md` que llamaba al contrato "casi vacío": es real para las
+  capas que existen (`rate`, `state`, `physics`, `_types`); lo que falta
+  es la jerarquía completa (`solvers`/`network`/`losses`, inexistentes
+  todavía).
+- `ROADMAP.md` §Decisiones: el ítem "Reglas de `[tool.mypy]` y
+  `[tool.importlinter]` generadas con asistencia" pasa de Abiertas a
+  Cerradas — quedaron revisadas y verificadas, precondición del paper
+  JOSS cumplida.
+
+**Hallazgos nuevos:**
+
+- `networkx` está declarado como runtime dependency en `pyproject.toml`
+  y no se usa en ningún import de `src/`. Claim sin verificar en el mismo
+  archivo donde vive el principio 7. No se toca hasta que `network/`
+  exista (v0.2) — anotado, no removido.
+- `pandas` está en el contrato `forbidden` de `import-linter` pero no en
+  `dependencies`. No rompe nada hoy porque nadie lo importa en capa cero;
+  `to_frames()` (scope v0.2) lo va a volver runtime dep, momento en el
+  que hay que reverificar que el `forbidden` siga siendo correcto.
+
+**Abierto** → `ROADMAP.md` §Abiertas: los dos hallazgos arriba, agregados
+como ítems nuevos.
+
+**Próximo paso:**
+
+- Los 8 errores de mypy en CI (rojo desde 2026-08-17, no reproducen en
+  local Windows/3.12 vs. Ubuntu/3.10+3.12 de CI) siguen sin resolver —
+  es el bloqueante real antes de seguir con implementación.
