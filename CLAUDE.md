@@ -694,9 +694,47 @@ Rate ──► composición (intensiva)
 2. **No implementes nada que no tenga firma/decisión cerrada.** Si algo no
    está en "Decisiones cerradas" de este archivo ni en el ADR
    correspondiente en `docs/design/`, para y preguntá — no asumas.
-3. Commits atómicos, chicos, contra `dev` limpia.
+3. Commits atómicos, chicos, contra `dev` limpia - ver "convenciones de git"
 4. Al cerrar la sesión: actualizá `docs/session-log.md` (qué se cerró, qué
    quedó abierto, próximo paso en una frase) antes de terminar.
+   
+## Convenciones de git: Workflow de implementación → commit
+
+**Rige para toda sesión de código (Claude Code) contra spec ya cerrada.**
+
+1. **Prompt de trabajo.** Spec cerrada en diseño, o genérico + pedido de
+   arreglo puntual (tipado, error de test) sobre código ya andando.
+
+2. **Implementación.** Claude Code implementa, corre ruff / mypy / pytest,
+   y arregla lo mecánico (`ruff --fix`, anotaciones, imports) sin pedir
+   aprobación intermedia.
+
+   **Se detiene y consulta, sin resolver por su cuenta, si aparece
+   cualquiera de estas tres cosas:**
+   - un test preexistente deja de pasar y el fix no es evidente,
+   - un check se resuelve agregando una supresión
+     (`# type: ignore`, `# noqa`, `@pytest.mark.skip`) en vez de un fix real,
+   - un refactor toca código fuera del alcance del prompt y no es trivial
+     de justificar.
+
+3. **Stage, no commit.** `git add` de los cambios agrupados en commits
+   lógicos — uno por naturaleza de cambio (feature ≠ fix mecánico ≠ arreglo
+   de tipado), aunque vengan del mismo prompt. Para cada commit propuesto,
+   muestra el mensaje de commit en texto plano. **Nunca ejecuta
+   `git commit` ni `git push` sin aprobación explícita.**
+
+4. **Revisión humana.** El diff staged se revisa en VS Code (panel de
+   Source Control), no en consola. Commit por commit.
+
+5. **Aprobación → commit + push.** Con el ok explícito por commit,
+   Claude Code ejecuta `git commit` y `git push` a `dev`.
+
+Para cambios solo-`.md` (arquitectura, roadmap): mismo flujo. El diff es
+más chico pero el mensaje se revisa igual — es el registro trazable de la
+decisión.
+
+**Punto de no retorno: el commit.** Todo lo anterior a `git commit` es
+reversible con `git reset` sin dejar rastro en el historial.
 
 ## Dónde está cada cosa
 
