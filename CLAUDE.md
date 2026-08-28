@@ -546,6 +546,22 @@ Rate ──► composición (intensiva)
     en toda la jerarquía (`ScalarRateBase` y `VectorRateBase` reciben y
     devuelven el mismo tipo de `value`, un `ArrayLike`), sin rama especial
     para el caso multi-cantidad.
+    **Corrección de tipo (2026-08-28)**: `VectorRateBase.__init__` y el
+    atributo `value` angostan a `npt.NDArray[np.float64]` (sin la rama
+    `float` de `ArrayLike`) — un vector nunca es escalar por contrato, así
+    que no tiene sentido tipar la entrada como si pudiera serlo. Verificado
+    que esto **no** rompe la uniformidad que motivaba `ArrayLike`: mypy
+    tipa el cuerpo genérico de `_rebuild`/`_combine` contra la firma
+    declarada en `BaseRate`, no contra la de cada subclase, así que
+    `type(self)(value)` sigue tipando limpio sin rama especial; y en
+    runtime `self.value` de un `VectorRateBase` siempre es ya `ndarray`
+    (por el `np.asarray` del `__init__`), así que ningún call site interno
+    se rompe. Bonus: el `cast` en `as_physics_kwargs` pasa a ser redundante
+    (mypy lo marca `[redundant-cast]`) y se borra. El único costo es que
+    `VectorRateBase(5.0)` — el input inválido que el `ValueError` de
+    runtime existe para rechazar — ahora es también un error estático, y el
+    test que lo ejercita necesita `# type: ignore[arg-type]`
+    (`tests/test_rate_base.py`).
 38. **`LossFunc` es una instancia, y es stateless respecto del eje.** El
     constructor lleva **únicamente política numérica**: `gradient_fn`,
     `detailed_fn`, método de root-find, tolerancias, parámetros de

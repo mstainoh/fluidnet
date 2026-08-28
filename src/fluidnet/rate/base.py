@@ -14,7 +14,7 @@ which share no inheritance between them.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, ClassVar, cast
+from typing import TYPE_CHECKING, ClassVar
 
 import numpy as np
 import numpy.typing as npt
@@ -59,6 +59,7 @@ class BaseRate(ABC):
             return NotImplemented
         return self._combine(other)
 
+    # --- Utility algebra ----------------------------------------------
     def __mul__(self, scalar: ArrayLike) -> Self:
         return self._rebuild(self.value * scalar)
 
@@ -67,12 +68,21 @@ class BaseRate(ABC):
     def __neg__(self) -> Self:
         return self._rebuild(-self.value)
 
+    # --- Representation -----------------------------------------------
     def __repr__(self) -> str:
         return f"{type(self).__name__}({self.value!r})"
 
 
 class ScalarRateBase(BaseRate):
-    """``BaseRate`` convenience for a single named physics quantity (#35)."""
+    """
+    ``BaseRate`` convenience for a single named physics quantity (#35).
+    
+    Note that the value may be a scalar or an array. The equation itself
+    is scalar, but the solver may evaluate it at multiple scenarios in parallel
+    if the function allows vector input. 
+    
+    The physics key is always a single string.
+    """
 
     __slots__ = ()
 
@@ -98,7 +108,12 @@ class VectorRateBase(BaseRate):
     #: Canonical ``physics`` kwarg names, one per quantity axis entry (#21).
     physics_keys: ClassVar[tuple[str, ...]]
 
-    def __init__(self, value: ArrayLike) -> None:
+    #: Narrows ``BaseRate.value`` (#37 correction, 2026-08-28): a vector
+    #: a vector rate should never be a bare scalar, 
+    #  so unlike it doesn't need the ``float`` branch of ``ArrayLike``.
+    value: npt.NDArray[np.float64]
+
+    def __init__(self, value: npt.NDArray[np.float64]) -> None:
         value = np.asarray(value)
         if value.ndim == 0 or value.shape[0] != len(self.physics_keys):
             raise ValueError(
@@ -109,5 +124,4 @@ class VectorRateBase(BaseRate):
         super().__init__(value)
 
     def as_physics_kwargs(self) -> dict[str, ArrayLike]:
-        value = cast(npt.NDArray[np.float64], self.value)
-        return dict(zip(self.physics_keys, value, strict=True))
+        return dict(zip(self.physics_keys, self.value, strict=True))
