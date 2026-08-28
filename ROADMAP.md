@@ -228,9 +228,15 @@ todo agua, o pozos de composición equivalente.
 **Scope IN**
 
 - `Rate` (`Protocol`) + `BaseRate` (ABC de conveniencia) con los hermanos
-  `ScalarRateBase`/`VectorRateBase` (#35–#37). Álgebra: `__add__`,
-  `__mul__`, `__neg__` — sin `__radd__`, sin `mix()`, sin `__sub__`
-  (`CLAUDE.md` #22); el balance de nodo es `reduce(add, rates)`.
+  `ScalarRateBase`/`VectorRateBase` (#35–#37). El `Protocol` declara solo
+  `as_physics_kwargs` y `__add__` — sin `__radd__`, sin `mix()`, sin
+  `__sub__` (`CLAUDE.md` #22); el balance de nodo es `reduce(add, rates)`.
+  `__mul__`/`__neg__` quedan en `BaseRate` (no en el `Protocol`): en v0.2 el
+  solver nunca sostiene un objeto `Rate` durante la integración (consume
+  `as_physics_kwargs()` hoisteado), así que escalar un `Rate` no es un
+  requisito genérico — sigue siendo conveniencia de `BaseRate` de cara al
+  optimizer de fitting (v0.5). *(corrección 2026-08-28, angosta el scope de
+  `Protocol` declarado acá desde su versión original)*
   Implementaciones concretas en `rate/fluids/`: `MassRate`,
   `VolumetricRate`, `BrineRate`. Contenido: magnitud extensiva +
   composición intensiva, **sin propiedades de fluido**.
