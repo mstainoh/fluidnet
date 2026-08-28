@@ -298,11 +298,14 @@ from typing import Protocol, TypeVar
 
 S_co = TypeVar("S_co", bound="State", covariant=True)
 
+
 class StateModel(Protocol[S_co]):
     def bind(self, **fields: object) -> BoundStateModel[S_co]: ...
 
+
 class BoundStateModel(Protocol[S_co]):
     def __call__(self, *, x: float, across: ArrayLike) -> S_co: ...
+
 
 class State(Protocol):
     def as_physics_kwargs(self) -> dict[str, ArrayLike]: ...

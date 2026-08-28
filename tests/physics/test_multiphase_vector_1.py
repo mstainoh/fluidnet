@@ -114,9 +114,7 @@ class TestDetailedScalarContract:
 
     def test_detailed_scalar_contract_today(self) -> None:
         """Scalars in -> scalars out; no stray 0-d array leaks into GradientResult."""
-        calc = _beggs_brill_detailed(
-            mass_rate_liquid=0.8, mass_rate_gas=0.05, 
-            **DETAILED_ARGS)
+        calc = _beggs_brill_detailed(mass_rate_liquid=0.8, mass_rate_gas=0.05, **DETAILED_ARGS)
         grad = calc["gradient"]
 
         for value in (
@@ -137,8 +135,10 @@ class TestDetailedScalarContract:
         qg = np.array([0.05, 0.06])
         with pytest.raises(ValueError, match="ambiguous"):
             _beggs_brill_detailed(
-                mass_rate_liquid=ql, mass_rate_gas=qg,  # type: ignore[arg-type]
-                 **DETAILED_ARGS)
+                mass_rate_liquid=ql,
+                mass_rate_gas=qg,  # type: ignore[arg-type]
+                **DETAILED_ARGS,
+            )
 
     @pytest.mark.xfail(
         strict=True, reason="v0.5 roadmap: broadcast rates -> vectorized GradientResult"
@@ -147,7 +147,9 @@ class TestDetailedScalarContract:
         ql = np.array([0.8, 1.0, 1.2])
         qg = np.array([0.05, 0.06, 0.07])
         calc = _beggs_brill_detailed(
-            mass_rate_liquid=ql, mass_rate_gas=qg, **DETAILED_ARGS  # type: ignore[arg-type]
+            mass_rate_liquid=ql,
+            mass_rate_gas=qg,
+            **DETAILED_ARGS,  # type: ignore[arg-type]
         )
         assert calc["gradient"].total.shape == (3,)
 
@@ -169,8 +171,10 @@ class TestGradientScalarContract:
         qg = np.array([0.05, 0.06])
         with pytest.raises(ValueError, match="ambiguous"):
             beggs_brill_gradient(
-                mass_rate_liquid=ql, mass_rate_gas=qg,  # type: ignore[arg-type]
-                **DETAILED_ARGS)
+                mass_rate_liquid=ql,
+                mass_rate_gas=qg,  # type: ignore[arg-type]
+                **DETAILED_ARGS,
+            )
 
     @pytest.mark.xfail(
         strict=True, reason="v0.5 roadmap: broadcast rates -> vectorized GradientResult"
@@ -179,6 +183,8 @@ class TestGradientScalarContract:
         ql = np.array([0.8, 1.0, 1.2])
         qg = np.array([0.05, 0.06, 0.07])
         grad = beggs_brill_gradient(
-            mass_rate_liquid=ql, mass_rate_gas=qg,  # type: ignore[arg-type]
-            **DETAILED_ARGS)
+            mass_rate_liquid=ql,
+            mass_rate_gas=qg,  # type: ignore[arg-type]
+            **DETAILED_ARGS,
+        )
         assert np.asarray(grad.total).shape == (3,)

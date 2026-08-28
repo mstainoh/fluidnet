@@ -26,14 +26,14 @@ from src.network import Network
 
 # Define edges as (node1, node2, edge_data)
 edges = [
-    ('A', 'B', {'length': 10, 'diameter': 0.5}),
-    ('B', 'C', {'length': 5, 'diameter': 0.5}),
+    ("A", "B", {"length": 10, "diameter": 0.5}),
+    ("B", "C", {"length": 5, "diameter": 0.5}),
 ]
 
 # Define node attributes
 node_attributes = {
-    'A': {'elevation': 10},
-    'C': {'elevation': 0},
+    "A": {"elevation": 10},
+    "C": {"elevation": 0},
 }
 
 # Initialize the network
@@ -41,8 +41,8 @@ network = Network(edges, node_attributes)
 
 # Set boundary conditions
 network.set_boundary_conditions(
-    head_bc={'A': 100},  # Head at node A
-    rate_bc={'C': -10},  # Flow rate out of node C
+    head_bc={"A": 100},  # Head at node A
+    rate_bc={"C": -10},  # Flow rate out of node C
 )
 
 # Calculate node heads and edge flows
@@ -56,7 +56,7 @@ print("Node Heads:", Hs)
 Propagates flow rates through the network and optionally calculates node heads.
 
 ```python
-node_rates, edge_rates, node_heads = network.propagate_rates(rate_bc={'A': 50}, H0=0)
+node_rates, edge_rates, node_heads = network.propagate_rates(rate_bc={"A": 50}, H0=0)
 ```
 
 #### `balance`
@@ -78,7 +78,7 @@ flow_in, flow_out = network.get_node_flows(edge_flows)
 Computes node heads based on edge rates and an end head value.
 
 ```python
-node_heads = network.get_head_from_edge_rates(edge_rates={'A': 10, 'B': -10}, end_head=100)
+node_heads = network.get_head_from_edge_rates(edge_rates={"A": 10, "B": -10}, end_head=100)
 ```
 
 ## Project Structure
@@ -116,8 +116,8 @@ Common edge parameters (e.g., fluid density, viscosity) can be shared across all
 
 ```python
 common_params = {
-    'density': 1000,
-    'viscosity': 0.001,
+    "density": 1000,
+    "viscosity": 0.001,
 }
 network = Network(edges, common_parameters=common_params)
 ```
