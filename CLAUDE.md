@@ -810,11 +810,21 @@ aplicá directo:
   - **Automático, en cada commit** (`pre-commit`): `ruff check --fix`,
     `ruff format`, `lint-imports`. Son reglas: si fallan, el commit no
     entra. Requiere `pre-commit install` una vez por clon.
-  - **Manual, al cerrar sesión**: `python -m mypy` y `pytest`. Son
-    correctitud, no reglas; corren completos y no bloquean commits
-    intermedios.
+  - **Manual, al cerrar sesión**: `python -m mypy`, `python -m mypy tests/`
+    y `pytest`. Son correctitud, no reglas; corren completos y no bloquean
+    commits intermedios.
   - No hay CI todavía: la verificación depende del operador local.
     Agendado en `ROADMAP §v1.0` (bloque de infraestructura de repositorio).
+- **`tests/` se chequea según convención existente, pero manual (nunca en
+  CI) (2026-08-28).** `ruff` ya cubre `tests/` por default. Para mypy:
+  corré `python -m mypy tests/` aparte del comando canónico (no se
+  fusiona a él ni a `checks.yml`) — varios tests llaman código a propósito
+  mal tipado para probar que falla en runtime, o para documentar
+  vectorización pendiente, y mypy los marca en rojo correctamente.
+  Arreglar errores de convención en tests es backlog: se arregla, pero no
+  bloquea desarrollo. Pendiente definir reglas específicas de pytest (p.
+  ej. permitir `# type: ignore` para contratos futuros que hoy dan
+  `xfail`).
 
 ## Atribución en commits
 
