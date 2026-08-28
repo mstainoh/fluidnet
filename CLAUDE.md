@@ -689,14 +689,32 @@ Rate ──► composición (intensiva)
 
 ## Cómo trabajar en una sesión de código
 
-1. Empezá leyendo `ROADMAP.md` (scope de la etapa actual) y
-   `docs/session-log.md` (último estado, próximo paso concreto).
-2. **No implementes nada que no tenga firma/decisión cerrada.** Si algo no
+Flujo en tres pasos — no se saltea ninguno. Es explícito a propósito y se
+puede revisar en cualquier momento, no es dogma.
+
+1. **Entender (los dos).** Empezá leyendo `ROADMAP.md` (scope de la etapa
+   actual) y `docs/session-log.md` (último estado, próximo paso concreto).
+   Antes de tocar código, decime en una frase o dos qué vas a hacer (ej.
+   "voy a arreglar este docstring", "voy a cambiar esta variable", "voy a
+   escribir esta función") y esperá confirmación antes de escribir nada.
+   **No implementes nada que no tenga firma/decisión cerrada.** Si algo no
    está en "Decisiones cerradas" de este archivo ni en el ADR
    correspondiente en `docs/design/`, para y preguntá — no asumas.
-3. Commits atómicos, chicos, contra `dev` limpia.
-4. Al cerrar la sesión: actualizá `docs/session-log.md` (qué se cerró, qué
-   quedó abierto, próximo paso en una frase) antes de terminar.
+   Excepción: si el approach ya se debatió en otro lado (otra sesión, otra
+   IA) o se dice explícitamente que se saltea, este paso se omite.
+2. **Hacer.** Implementación acotada a lo acordado en el paso 1 — nada más.
+3. **Chequear, y arreglar si hace falta.** Corré los checks relevantes (ver
+   "Entorno" más abajo). Ante una falla:
+   - Arreglo directo, sin preguntar, **solo si es obvio y de bajo riesgo**
+     (docstring, estilo de import, type hint faltante — ver también
+     "Tipado" para el caso específico de mypy).
+   - Cualquier otra falla (comportamiento de un test, desacuerdo con el
+     diseño, algo que toca una decisión cerrada) se discute antes de seguir
+     — volvé al paso 1, no arregles de una.
+
+Recién con los tres pasos cerrados: commit atómico y chico contra `dev`
+limpia. Al cerrar la sesión, actualizá `docs/session-log.md` (qué se cerró,
+qué quedó abierto, próximo paso en una frase) antes de terminar.
 
 ## Dónde está cada cosa
 
@@ -757,6 +775,16 @@ aplicá directo:
   código.
 - scipy: `ignore_missing_imports` vía override en `pyproject.toml`. No
   instalar `scipy-stubs`.
+- **Verificación, dos niveles deliberadamente asimétricos** (portado de
+  `README_CLAUDE.md`, ahora eliminado):
+  - **Automático, en cada commit** (`pre-commit`): `ruff check --fix`,
+    `ruff format`, `lint-imports`. Son reglas: si fallan, el commit no
+    entra. Requiere `pre-commit install` una vez por clon.
+  - **Manual, al cerrar sesión**: `python -m mypy` y `pytest`. Son
+    correctitud, no reglas; corren completos y no bloquean commits
+    intermedios.
+  - No hay CI todavía: la verificación depende del operador local.
+    Agendado en `ROADMAP §v1.0` (bloque de infraestructura de repositorio).
 
 ## Atribución en commits
 
