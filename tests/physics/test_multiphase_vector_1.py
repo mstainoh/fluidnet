@@ -9,6 +9,8 @@ day broadcasting lands, these tests turn green and `strict=True` forces the
 marker to be removed.
 """
 
+from typing import TypedDict
+
 import numpy as np
 import pytest
 
@@ -19,9 +21,29 @@ from fluidnet.physics.multiphase import (
 )
 from fluidnet.physics.multiphase.beggs_brill import _beggs_brill_detailed, _holdup
 
+
+class _DetailedArgs(TypedDict):
+    """Per-key types for `**DETAILED_ARGS` unpacking.
+
+    A plain `dict[str, float | bool]` widens every value to the union, so
+    mypy checks `float | bool` against `payne_correction: bool` and fails —
+    a `TypedDict` keeps each key's declared type distinct on unpacking.
+    """
+
+    density_liquid: float
+    density_gas: float
+    viscosity_liquid: float
+    viscosity_gas: float
+    D: float
+    inclination: float
+    roughness: float
+    sigma: float
+    payne_correction: bool
+
+
 # Shared scalar physical inputs (checalc.com sample, no Payne correction —
 # same case as test_checalc_case_no_payne in test_beggs_brill_vs_book.py).
-DETAILED_ARGS = dict(
+DETAILED_ARGS: _DetailedArgs = _DetailedArgs(
     density_liquid=613.8,
     density_gas=141.3,
     viscosity_liquid=0.5e-3,
@@ -49,7 +71,7 @@ class TestFlowmapVectorized:
             "distributed",
         ]
 
-        idx = beggs_brill_flowmap(Cl, NFr)
+        idx = np.asarray(beggs_brill_flowmap(Cl, NFr))
 
         assert idx.shape == (5,)
         assert [FLOW_REGIMES[i] for i in idx] == expected_regimes
@@ -92,7 +114,9 @@ class TestDetailedScalarContract:
 
     def test_detailed_scalar_contract_today(self) -> None:
         """Scalars in -> scalars out; no stray 0-d array leaks into GradientResult."""
-        calc = _beggs_brill_detailed(mass_rate_liquid=0.8, mass_rate_gas=0.05, **DETAILED_ARGS)
+        calc = _beggs_brill_detailed(
+            mass_rate_liquid=0.8, mass_rate_gas=0.05, 
+            **DETAILED_ARGS)
         grad = calc["gradient"]
 
         for value in (
@@ -112,7 +136,9 @@ class TestDetailedScalarContract:
         ql = np.array([0.8, 1.0])
         qg = np.array([0.05, 0.06])
         with pytest.raises(ValueError, match="ambiguous"):
-            _beggs_brill_detailed(mass_rate_liquid=ql, mass_rate_gas=qg, **DETAILED_ARGS)
+            _beggs_brill_detailed(
+                mass_rate_liquid=ql, mass_rate_gas=qg,  # type: ignore[arg-type]
+                 **DETAILED_ARGS)
 
     @pytest.mark.xfail(
         strict=True, reason="v0.5 roadmap: broadcast rates -> vectorized GradientResult"
@@ -120,7 +146,9 @@ class TestDetailedScalarContract:
     def test_detailed_vectorized_over_rates(self) -> None:
         ql = np.array([0.8, 1.0, 1.2])
         qg = np.array([0.05, 0.06, 0.07])
-        calc = _beggs_brill_detailed(mass_rate_liquid=ql, mass_rate_gas=qg, **DETAILED_ARGS)
+        calc = _beggs_brill_detailed(
+            mass_rate_liquid=ql, mass_rate_gas=qg, **DETAILED_ARGS  # type: ignore[arg-type]
+        )
         assert calc["gradient"].total.shape == (3,)
 
 
@@ -140,7 +168,9 @@ class TestGradientScalarContract:
         ql = np.array([0.8, 1.0])
         qg = np.array([0.05, 0.06])
         with pytest.raises(ValueError, match="ambiguous"):
-            beggs_brill_gradient(mass_rate_liquid=ql, mass_rate_gas=qg, **DETAILED_ARGS)
+            beggs_brill_gradient(
+                mass_rate_liquid=ql, mass_rate_gas=qg,  # type: ignore[arg-type]
+                **DETAILED_ARGS)
 
     @pytest.mark.xfail(
         strict=True, reason="v0.5 roadmap: broadcast rates -> vectorized GradientResult"
@@ -148,5 +178,7 @@ class TestGradientScalarContract:
     def test_gradient_vectorized_over_rates(self) -> None:
         ql = np.array([0.8, 1.0, 1.2])
         qg = np.array([0.05, 0.06, 0.07])
-        grad = beggs_brill_gradient(mass_rate_liquid=ql, mass_rate_gas=qg, **DETAILED_ARGS)
-        assert grad.total.shape == (3,)
+        grad = beggs_brill_gradient(
+            mass_rate_liquid=ql, mass_rate_gas=qg,  # type: ignore[arg-type]
+            **DETAILED_ARGS)
+        assert np.asarray(grad.total).shape == (3,)
