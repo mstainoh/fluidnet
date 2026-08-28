@@ -7,9 +7,12 @@ protocols.
 
 Sign convention (package-wide)
 ------------------------------
-Pressure gradients are expressed *in the direction of positive flow*:
-``dp = p_downstream - p_upstream``. A pressure **loss** is therefore
-**negative** for positive rates, and positive for negative (reversed) rates.
+Gradients are expressed *in the direction of positive flow*, e.g.:
+``dp = p_downstream - p_upstream``. A **loss** is therefore **negative**
+for positive rates, and positive for negative (reversed) rates.
+
+Note that many correlations / functions are expressed taking the flow quantity
+as strictly non-negative (e.g., for dimensionless numbers).
 """
 
 from .dimensionless import froude, mach, reynolds

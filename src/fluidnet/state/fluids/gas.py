@@ -1,3 +1,14 @@
+"""Provides convenience class implementations for gas. Two classes:
+
+``IdealGas``: instantiated with a molecular weight and a viscosity function
+(see ``physics.gas_correlations``, or a user-supplied one).
+
+``RealGas``: adds a ``z_fn`` (compressibility factor) and its derivative
+``dz_fn``, supplied by the caller. If critical values ``Pc``/``Tc`` are
+given, both are evaluated at reduced pressure/temperature instead of
+absolute values.
+"""
+
 from __future__ import annotations
 
 from collections.abc import Callable

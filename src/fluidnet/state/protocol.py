@@ -1,9 +1,16 @@
 """``StateModel`` / ``BoundStateModel`` — the neutral state protocol.
 
+State represents whatever is moving through the network: a fluid,
+electrical current, or any other conserved quantity, via properties that
+may vary across it (e.g. a fluid's density). Examples:
+
+    - Fluids: ``(composition, T, P) -> (rho, mu, beta, sigma)``.
+    - Electrical AC demo: ``(V) -> impedance``. Same shape either way.
+
 Domain-neutral by design (``CLAUDE.md`` #18): transforms the *across*
 variable of a node (plus any prescribed fields) into whatever a
-``gradient_fn`` needs. Fluids: ``(composition, T, P) -> (rho, mu, beta,
-sigma)``. Electrical AC demo: ``(V) -> impedance``. Same shape either way.
+``gradient_fn`` needs. See ``Architecture`` below for how ``State``,
+``StateModel``, and ``BoundStateModel`` relate.
 
 Two methods, two binding times (#28, #30):
 

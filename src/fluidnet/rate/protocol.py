@@ -7,9 +7,9 @@ across nodes the way flow does.
 
 Two things happen to it during a solve. Before integration,
 ``as_physics_kwargs()`` unpacks it into the flat SI kwargs ``gradient_fn``
-needs, hoisted once per edge (#22) — no ``Rate`` object enters the
-integration loop itself. After integration, ``propagate_rates`` walks the
-solved network and accumulates rates at nodes via ``__add__``; node mass
+needs, hoisted once per edge (``CLAUDE.md`` #22) — no ``Rate`` object enters
+the integration loop itself. After integration, ``propagate_rates`` walks
+the solved network and accumulates rates at nodes via ``__add__``; node mass
 balance, when it applies, is simply ``reduce(add, rates)`` of in vs. out
 edges. The contract is therefore exactly two methods: ``as_physics_kwargs``
 and ``__add__``.

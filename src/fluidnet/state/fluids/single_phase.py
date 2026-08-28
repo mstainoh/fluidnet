@@ -1,4 +1,14 @@
-"""Single-phase ``FluidState`` + ``Fluid`` implementations.
+"""Single-phase ``FluidState`` + ``Fluid`` implementations. Pressure-loss
+functions in fluids use three variables: compressibility (for momentum),
+density (gravity) and viscosity (friction losses, together with density
+via Reynolds number).
+
+For incompressible fluids (i.e. liquids), these are usually considered
+constant. For compressible fluids (i.e. gases), these vary according to
+an Equation of State. The signature of the EoS is agnostic to allow
+custom implementations, including custom correlations or — forward-looking,
+not yet supported by any class here — composition-dependent functions for
+compositional problems (v1.5).
 
 Layer zero, stateless (``CLAUDE.md`` #4): ``Fluid`` maps
 ``(composition, P, T) -> FluidState``, never freezes a density. Receives

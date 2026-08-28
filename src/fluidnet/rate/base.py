@@ -1,14 +1,18 @@
-"""``BaseRate`` — optional convenience base for ``Rate`` implementations.
+"""Optional convenience base classes for ``Rate`` implementations.
 
-Convenience, not requirement (``CLAUDE.md`` #34): the library annotates
-against the ``Rate`` Protocol, never against this class. It exists so an
-implementor gets the four network operations (mix at a node, scale by a
-split fraction, flip sign by edge direction) without rewriting them.
+Convenience, not requirement (``CLAUDE.md`` #34) — the library annotates
+against the ``Rate`` Protocol, never against this class. ``BaseRate`` is an
+abstract base providing the three network operations an implementor would
+otherwise rewrite: mix at a node (``__add__``), scale by a split fraction
+(``__mul__``), and flip sign by edge direction (``__neg__``). It declares no
+``physics_key``/``physics_keys`` (#35); each subclass supplies its own.
 
-``BaseRate`` itself declares no ``physics_key``/``physics_keys`` (#35): the
-scalar and vector conventions are incompatible ``ClassVar`` shapes, so they
-live on the two concrete siblings, ``ScalarRateBase`` and ``VectorRateBase``,
-which share no inheritance between them.
+Most rate quantities reduce to a float or a 1D array of floats, so the only
+thing an implementation needs is the mapping from quantity to
+the keyword the solver equation expects. That mapping is what the two
+concrete siblings provide: ``ScalarRateBase`` and ``VectorRateBase``, which
+share no inheritance between them since the scalar and vector
+``physics_key`` conventions are incompatible ``ClassVar`` shapes.
 """
 
 from __future__ import annotations
@@ -76,11 +80,11 @@ class BaseRate(ABC):
 class ScalarRateBase(BaseRate):
     """
     ``BaseRate`` convenience for a single named physics quantity (#35).
-    
+
     Note that the value may be a scalar or an array. The equation itself
     is scalar, but the solver may evaluate it at multiple scenarios in parallel
-    if the function allows vector input. 
-    
+    if the function allows vector input.
+
     The physics key is always a single string.
     """
 
@@ -109,7 +113,7 @@ class VectorRateBase(BaseRate):
     physics_keys: ClassVar[tuple[str, ...]]
 
     #: Narrows ``BaseRate.value`` (#37 correction, 2026-08-28): a vector
-    #: a vector rate should never be a bare scalar, 
+    #: a vector rate should never be a bare scalar,
     #  so unlike it doesn't need the ``float`` branch of ``ArrayLike``.
     value: npt.NDArray[np.float64]
 
