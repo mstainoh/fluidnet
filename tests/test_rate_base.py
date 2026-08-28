@@ -45,7 +45,7 @@ class TestVectorAsPhysicsKwargs:
 class TestVectorConstructionValidation:
     def test_scalar_input_raises(self) -> None:
         with pytest.raises(ValueError):
-            _TwoPhaseTestRate(5.0)
+            _TwoPhaseTestRate(5.0)  # type: ignore[arg-type]
 
     def test_wrong_leading_axis_length_raises(self) -> None:
         with pytest.raises(ValueError):
@@ -66,7 +66,7 @@ class TestQuantityAxisFirstBroadcasting:
 
 class TestCrossTypeAddition:
     def test_add_returns_not_implemented_directly(self) -> None:
-        result = _ScalarTestRate(1.0).__add__(_TwoPhaseTestRate(np.array([1.0, 2.0])))
+        result = _ScalarTestRate(1.0).__add__(_TwoPhaseTestRate(np.array([1.0, 2.0])))  # type: ignore[operator]
         assert result is NotImplemented
 
     def test_scalar_plus_vector_raises_type_error(self) -> None:
