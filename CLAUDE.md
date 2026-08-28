@@ -702,19 +702,49 @@ puede revisar en cualquier momento, no es dogma.
    correspondiente en `docs/design/`, para y preguntá — no asumas.
    Excepción: si el approach ya se debatió en otro lado (otra sesión, otra
    IA) o se dice explícitamente que se saltea, este paso se omite.
-2. **Hacer.** Implementación acotada a lo acordado en el paso 1 — nada más.
-3. **Chequear, y arreglar si hace falta.** Corré los checks relevantes (ver
-   "Entorno" más abajo). Ante una falla:
-   - Arreglo directo, sin preguntar, **solo si es obvio y de bajo riesgo**
-     (docstring, estilo de import, type hint faltante — ver también
-     "Tipado" para el caso específico de mypy).
-   - Cualquier otra falla (comportamiento de un test, desacuerdo con el
-     diseño, algo que toca una decisión cerrada) se discute antes de seguir
-     — volvé al paso 1, no arregles de una.
+2. **Hacer y chequear.** Implementación acotada a lo acordado en el paso 1.
+   Corré ruff / mypy / pytest y arreglá lo mecánico (`ruff --fix`,
+   anotaciones, imports, docstrings, type hint faltante — ver también
+   "Tipado" para el caso específico de mypy) sin pedir aprobación
+   intermedia: es lo obvio y de bajo riesgo.
+   **Frená y consultá, sin resolver por tu cuenta, si aparece cualquiera de
+   estas tres cosas:**
+   - un test preexistente deja de pasar y el fix no es evidente,
+   - un check se resuelve agregando una supresión (`# type: ignore`,
+     `# noqa`, `@pytest.mark.skip`) en vez de un fix real,
+   - un refactor toca código fuera del alcance del prompt y no es trivial
+     de justificar.
+   Cualquiera de las tres (o un desacuerdo con el diseño, o algo que toca
+   una decisión cerrada) se discute antes de seguir — volvé al paso 1, no
+   arregles de una.
+3. **Commit — ver "Convenciones de git" más abajo.** No es automático:
+   stage, mensaje propuesto, revisión humana, recién ahí commit + push.
 
-Recién con los tres pasos cerrados: commit atómico y chico contra `dev`
-limpia. Al cerrar la sesión, actualizá `docs/session-log.md` (qué se cerró,
-qué quedó abierto, próximo paso en una frase) antes de terminar.
+Al cerrar la sesión, actualizá `docs/session-log.md` (qué se cerró, qué
+quedó abierto, próximo paso en una frase) antes de terminar.
+
+## Convenciones de git: de la implementación al commit
+
+**Rige para toda sesión de código (Claude Code) contra spec ya cerrada.**
+Continúa el paso 3 de "Cómo trabajar en una sesión de código", una vez
+cerrados ahí los pasos 1 (entender) y 2 (hacer y chequear):
+
+1. **Stage, no commit.** `git add` de los cambios agrupados en commits
+   lógicos — uno por naturaleza de cambio (feature ≠ fix mecánico ≠ arreglo
+   de tipado), aunque vengan del mismo prompt. Para cada commit propuesto,
+   mostrá el mensaje de commit en texto plano. **Nunca ejecutes
+   `git commit` ni `git push` sin aprobación explícita.**
+2. **Revisión humana.** El diff staged se revisa en VS Code (panel de
+   Source Control), no en consola. Commit por commit.
+3. **Aprobación → commit + push.** Con el ok explícito por commit, se
+   ejecuta `git commit` y `git push` a `dev`.
+
+Para cambios solo-`.md` (arquitectura, roadmap): mismo flujo. El diff es
+más chico pero el mensaje se revisa igual — es el registro trazable de la
+decisión.
+
+**Punto de no retorno: el commit.** Todo lo anterior a `git commit` es
+reversible con `git reset` sin dejar rastro en el historial.
 
 ## Dónde está cada cosa
 
@@ -730,8 +760,8 @@ qué quedó abierto, próximo paso en una frase) antes de terminar.
 
 ## Tipado (housekeeping, no arquitectura)
 
-**Esta sección tiene precedencia sobre "Cómo trabajar §2" para errores de
-mypy.** Los errores de tipado (`no-any-return`, `no-untyped-def`,
+**Esta sección tiene precedencia sobre el paso 2 ("Hacer y chequear") de
+"Cómo trabajar en una sesión de código" para errores de mypy.** Los errores de tipado (`no-any-return`, `no-untyped-def`,
 `import-untyped`, `arg-type` por float/array) son mecánicos, no decisiones
 de diseño. No pares a preguntar ni greppees tests/docs antes de tipar —
 aplicá directo:
