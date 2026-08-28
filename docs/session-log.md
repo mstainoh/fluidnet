@@ -25,6 +25,60 @@
 
 ---
 
+## 2026-08-28 — código: redacción de docstrings post-merge `feature-rate`
+
+**Cerrado:**
+
+- Revisión archivo por archivo (diff contra `HEAD`, no todo el árbol) de los
+  docstrings de módulo tocados por el merge de `feature-rate`: `rate/base.py`,
+  `rate/protocol.py`, `rate/__init__.py`, `rate/fluids/__init__.py`,
+  `rate/fluids/single_phase.py`, `state/protocol.py`, `state/fluids/gas.py`,
+  `state/fluids/single_phase.py`, `physics/__init__.py`,
+  `physics/gas_correlations/__init__.py`. Cada uno revisado y corregido en
+  conversación uno por uno (no en bloque) — commit único `f64d4c0`.
+- Clase de errores corregidos, con ejemplos concretos:
+  - **Contenido desincronizado con el código**: `rate/fluids/single_phase.py`
+    decía que `VolumetricRate` hoistea como `"rate"`; el `physics_key` real es
+    `"volumetric_rate"`.
+  - **Afirmación no verificable**: `physics/__init__.py` decía que la
+    no-negatividad de ciertos inputs "is explicitly checked in the function"
+    para "many correlations/functions" — grepeado el paquete, solo
+    `friction_factor` valida (`raise ValueError` si `re < 0`);
+    `reynolds`/`froude`/`mach` no chequean nada. Se sacó la afirmación en vez
+    de corregirla (a pedido explícito, "por las dudas sacalo").
+  - **Redundancia dentro del mismo docstring**: `state/protocol.py` agregó una
+    frase que repetía casi textual el bloque `Architecture:` ya presente más
+    abajo en el mismo docstring — se reemplazó por una referencia cruzada.
+  - **Modificador colgando que rompe una decisión cerrada**: `rate/__init__.py`
+    reescribió la frase de forma que "defined by contract, not by content"
+    (el enunciado de `CLAUDE.md` #22) pasó a calificar "intensive properties"
+    en vez de `Rate` — reparado preservando la mejora de contenido real del
+    cambio (que la composición es opcional por subclase, no de `BaseRate`).
+  - Mecánico en casi todos: trailing whitespace, falta de línea en blanco
+    entre el docstring de módulo y el primer `import`, guiones ASCII donde el
+    resto usa em-dash, typos (`instanes`, `passses`, `e.g,`).
+- `ruff format .` corrido sobre todo el repo (no solo lo tocado en la sesión):
+  encontró 3 archivos ya desalineados de antes — `README.md`, `docs/design/
+  architecture-v0.2.md`, `tests/physics/test_multiphase_vector_1.py` (ruff
+  0.16 formatea bloques de código Python embebidos en Markdown, de ahí que
+  aparecieran los `.md`). Corregido, mecánico, commit separado `cf7bf15`.
+- Ambos commits pusheados a `origin/dev`.
+
+**Abierto:**
+
+- Sesión de housekeeping puro; no hubo decisiones de diseño ni cambios de
+  scope. `ROADMAP.md` no requirió cambios.
+- **Pendiente encontrado, no diseñado todavía**: `BrineRate` (composición +
+  mezcla ponderada por caudal) podría generalizarse — `Gas` implementa la
+  misma fórmula de mezcla. La idea a evaluar es una `FluidWithComposition`
+  genérica que cubra gas, agua, petróleo, etc. en vez de una clase por
+  fluido. Sin decidir todavía — hay que pensarlo con calma, no diseñar en
+  caliente al cierre de esta sesión.
+
+**Próximo paso:** ninguno bloqueado por esta sesión.
+
+---
+
 ## 2026-08-17 — código: infraestructura de repositorio
 
 **Cerrado:**
