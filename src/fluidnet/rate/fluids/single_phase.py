@@ -1,7 +1,8 @@
 """Standard ``Rate`` implementations for single-phase fluids.
 
-No composition, no phase vector. Each declares the ``physics_key`` that
-``as_physics_kwargs()`` uses to hoist it into the gradient kwargs (#21, #22).
+No composition, no phase vector. Each class declares the
+``physics_key`` that ``as_physics_kwargs()`` uses to hoist it into
+the gradient kwargs (#21, #22).
 
 ``MassRate``: passes values as ``mass_rate``.
 ``VolumetricRate``: passes values as ``volumetric_rate``.
