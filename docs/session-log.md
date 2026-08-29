@@ -25,6 +25,72 @@
 
 ---
 
+## 2026-08-29 — código: `BrineRate` → `CompositionalScalarRateBase`
+
+**Cerrado:**
+
+- Refactor mecánico (rename + move, sin cambios de lógica): la mezcla
+  ponderada por caudal que vivía en `BrineRate._combine`
+  (`rate/fluids/brine.py`) sube a una base genérica
+  `CompositionalScalarRateBase` en `rate/base.py`, subclase de
+  `ScalarBaseRate` — `__init__`, `_rebuild`, `_combine` y
+  `__slots__ = ("composition",)` migrados tal cual, sin `physics_key`
+  propio (lo declara la subclase concreta, mismo grado de abstracción que
+  `ScalarBaseRate`/`VectorBaseRate`).
+- Mensaje del `ValueError` de no-negatividad generalizado con
+  `type(self).__name__` en vez de literal `"BrineRate"`.
+- `BrineRate` queda como subclase fina: `__slots__ = ()` +
+  `physics_key: ClassVar[str] = "mass_rate"` + docstring, misma forma que
+  `MassRate`/`VolumetricRate`.
+- Docstring de `BaseRate` corregido: ya no dice "subclasses that carry
+  composition (v1.5)" — la composición como trazador pasivo es v0.2, existe
+  hoy vía `CompositionalScalarRateBase`; lo que es v1.5 es la
+  retroalimentación composición→propiedades (`CLAUDE.md` #22), no la
+  existencia de la clase.
+- Docstring nuevo de `CompositionalScalarRateBase` documenta la
+  precondición pedida (no como mecanismo): `value` tiene que ser la
+  extensiva de la que la composición es fracción y que se conserva en el
+  nodo; hoy coincide con lo que consume `physics_key` pero es coincidencia
+  del caso actual, no garantía de la base. Sin `ClassVar` de
+  base/unidad de composición — el caso que lo necesitaría no está
+  diseñado.
+- Exports: `CompositionalScalarRateBase` no se agregó a
+  `rate/__init__.py.__all__` ni al import de fachada — mismo criterio que
+  `ScalarBaseRate`, que tampoco está expuesto ahí.
+- Tests de mezcla/validación/broadcasting movidos de `test_rate_algebra.py`
+  a `test_rate_base.py` contra un dummy `_CompositionalTestRate` (mismo
+  patrón que `_ScalarTestRate`/`_TwoPhaseTestRate`). `test_rate_algebra.py`
+  queda con el rechazo cruzado `MassRate + BrineRate → TypeError` y un test
+  corto de que `BrineRate` declara `physics_key == "mass_rate"` y hereda la
+  mezcla ponderada. Cobertura equivalente antes/después (26 tests entre los
+  dos archivos, ninguno perdido).
+- Verificación: `pre-commit run --all-files`, `python -m mypy`, `pytest`
+  (suite completa) y `lint-imports`, los cuatro en verde. `python -m mypy
+  tests/` sigue con los mismos 6 errores preexistentes en
+  `test_multiphase_vector_1.py` (backlog documentado, sin relación con este
+  cambio).
+
+**Abierto:**
+
+- `ROADMAP.md §Abiertas` tiene el ítem *"Dónde vive la composición en
+  v1.5, con `VectorBaseRate` empaquetado y eje de cantidad primero"*
+  (anotado 2026-08-14) — sigue abierto, sin resolver por esta sesión: este
+  refactor generalizó la opción (b) (atributo separado del `Rate`,
+  `dict[str, ArrayLike]`) para cualquier rate escalar, pero la pregunta de
+  fondo (a/b/c para el caso `VectorBaseRate`/multifásico) no se tocó —
+  fuera de scope explícito del pedido.
+- Mismo `ROADMAP.md §Abiertas` menciona el guard de `total == 0` en
+  `BrineRate._combine` como candidato a `raise` al habilitar signos
+  mixtos/ciclos — el guard ahora vive en `CompositionalScalarRateBase._combine`,
+  no en `BrineRate`; no se tocó la lógica, solo señalado acá para que la
+  próxima sesión que toque ese ítem sepa dónde buscar.
+- No se reescribió `ROADMAP.md` — señalado en este log a pedido explícito
+  del prompt de la sesión.
+
+**Próximo paso:** ninguno bloqueado por esta sesión.
+
+---
+
 ## 2026-08-28 — código: redacción de docstrings post-merge `feature-rate`
 
 **Cerrado:**

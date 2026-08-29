@@ -1,17 +1,16 @@
 """Contract tests for the ``Rate`` protocol: ``MassRate`` and ``BrineRate``.
 
-No ``__eq__`` on ``BaseRate`` (CLAUDE.md #22), so assertions compare
-``.value``/``.composition`` directly (``np.allclose`` for array values)
-instead of comparing ``Rate`` instances.
+Mixing/validation/broadcasting behavior belongs to
+``CompositionalScalarRateBase`` and is tested against a dummy in
+``tests/test_rate_base.py``; this file keeps only what's specific to these
+two concrete types.
 """
 
 from __future__ import annotations
 
-import warnings
 from functools import reduce
 from operator import add
 
-import numpy as np
 import pytest
 
 from fluidnet.rate import BrineRate, MassRate
@@ -33,62 +32,11 @@ class TestMassRateAlgebra:
             MassRate(1.0) + BrineRate(1.0, {"NaCl": 0.1})  # type: ignore[operator]
 
 
-class TestBrineRateScaling:
-    def test_scaling_preserves_composition(self) -> None:
-        """#3: __mul__ scales the extensive, composition is invariant."""
-        scaled = BrineRate(5.0, {"NaCl": 0.1}) * 3
-        assert scaled.value == 15.0
-        assert scaled.composition == {"NaCl": 0.1}
+class TestBrineRateIdentity:
+    def test_declares_mass_rate_physics_key(self) -> None:
+        assert BrineRate.physics_key == "mass_rate"
 
-
-class TestBrineRateMixing:
-    def test_weighted_mixing(self) -> None:
+    def test_inherits_weighted_mixing(self) -> None:
         mixed = BrineRate(1.0, {"NaCl": 0.0}) + BrineRate(3.0, {"NaCl": 0.2})
         assert mixed.value == 4.0
-        assert np.isclose(mixed.composition["NaCl"], 0.15)
-
-    def test_key_union_dilutes_species_absent_from_one_side(self) -> None:
-        mixed = BrineRate(1.0, {"NaCl": 0.5}) + BrineRate(1.0, {})
-        assert mixed.value == 2.0
-        assert np.isclose(mixed.composition["NaCl"], 0.25)
-
-    def test_zero_contribution_no_warning(self) -> None:
-        with warnings.catch_warnings():
-            warnings.simplefilter("error")
-            mixed = BrineRate(0.0, {}) + BrineRate(5.0, {"NaCl": 0.1})
-        assert mixed.value == 5.0
-        assert mixed.composition == {"NaCl": 0.1}
-
-    def test_all_zero_junction_no_error(self) -> None:
-        """Every upstream well shut in: guarded denominator yields 0.0,
-        not ZeroDivisionError/RuntimeWarning (ROADMAP §Abiertas, guard is
-        provisional to DAG + non-negative rates)."""
-        with warnings.catch_warnings():
-            warnings.simplefilter("error")
-            mixed = BrineRate(0.0, {}) + BrineRate(0.0, {})
-        assert mixed.value == 0.0
-
-
-class TestBrineRateValidation:
-    def test_negative_scalar_raises(self) -> None:
-        with pytest.raises(ValueError):
-            BrineRate(-1.0, {})
-
-    def test_negative_array_element_raises(self) -> None:
-        with pytest.raises(ValueError):
-            BrineRate(np.array([1.0, -1.0]), {})
-
-
-class TestBrineRateBroadcasting:
-    def test_mixes_against_scalar_valued_rate(self) -> None:
-        vector_rate = BrineRate(np.array([1.0, 3.0]), {"NaCl": 0.1})
-        scalar_rate = BrineRate(2.0, {"NaCl": 0.1})
-        mixed = vector_rate + scalar_rate
-        assert np.allclose(mixed.value, np.array([3.0, 5.0]))
-        assert np.allclose(mixed.composition["NaCl"], 0.1)
-
-    def test_incompatible_shapes_raise(self) -> None:
-        a = BrineRate(np.array([1.0, 3.0]), {"NaCl": 0.1})
-        b = BrineRate(np.array([1.0, 2.0, 3.0]), {"NaCl": 0.1})
-        with pytest.raises(ValueError):
-            a + b
+        assert mixed.composition["NaCl"] == pytest.approx(0.15)

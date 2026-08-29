@@ -32,9 +32,9 @@ if TYPE_CHECKING:
 class BaseRate(ABC):
     """Single extensive quantity, no composition.
 
-    Subclasses that carry composition (v1.5) override ``_combine`` — the
-    extensive part still adds, the intensive part becomes a weighted
-    average.
+    ``CompositionalScalarRateBase`` overrides ``_combine`` for subclasses
+    that carry a passive-tracer composition — the extensive part still
+    adds, the intensive part becomes a flow-weighted average.
     """
 
     __slots__ = ("value",)
@@ -95,6 +95,63 @@ class ScalarBaseRate(BaseRate):
 
     def as_physics_kwargs(self) -> dict[str, ArrayLike]:
         return {self.physics_key: self.value}
+
+
+class CompositionalScalarRateBase(ScalarBaseRate):
+    """``ScalarBaseRate`` convenience for a scalar rate that also carries a
+    passive-tracer composition (#22): it propagates and mixes with no
+    feedback on physical properties. ``_combine`` sums the extensive part
+    and flow-weights the composition; ``_rebuild`` leaves composition
+    untouched, so ``__mul__``/``__neg__`` scale the extensive only.
+
+    Precondition, not mechanism: ``value`` must be the extensive quantity
+    that the composition is a fraction *of*, and that quantity must be
+    conserved at the node — the mixing rule below only makes sense on that
+    basis. Today this coincides with the quantity named by ``physics_key``
+    (mass: it is conserved, and it is also what ``single_phase_gradient``
+    consumes), but that's a coincidence of the current concrete subclasses,
+    not a guarantee this base enforces — it is serving two distinct
+    requirements with one ``value``: the mixing basis at propagation, and
+    the kwarg the gradient equation consumes. A rate whose mixing basis is
+    molar / standard-volume while its gradient equation consumes mass
+    cannot use this base without a conversion that doesn't exist yet.
+    """
+
+    __slots__ = ("composition",)
+
+    def __init__(self, value: ArrayLike, composition: dict[str, ArrayLike]) -> None:
+        if np.any(np.asarray(value) < 0.0):
+            raise ValueError(
+                f"{type(self).__name__} requires a non-negative rate: a negative "
+                "flow with positive composition has no physical meaning, and the "
+                "flow-weighted mixing rule turns it into negative composition."
+            )
+        super().__init__(value)
+        self.composition = composition
+
+    def _rebuild(self, value: ArrayLike, composition: dict[str, ArrayLike] | None = None) -> Self:
+        """Same intensive state, new extensive (#3: ``__mul__`` leaves
+        composition intact). The optional parameter keeps the override
+        compatible with ``BaseRate``'s one-argument call sites."""
+        return type(self)(value, self.composition if composition is None else composition)
+
+    def _combine(self, other: Self) -> Self:
+        """#3: extensives add, composition is flow-weighted."""
+        total = self.value + other.value
+        # All-zero junction (every upstream well shut in): numerator is zero
+        # too, so guarding the denominator yields 0.0. Guard the denominator
+        # rather than np.where on the result — numpy would evaluate the
+        # division anyway and emit RuntimeWarning.
+        denom = np.where(total == 0.0, 1.0, total)
+        mixed: dict[str, ArrayLike] = {
+            k: (
+                self.value * self.composition.get(k, 0.0)
+                + other.value * other.composition.get(k, 0.0)
+            )
+            / denom
+            for k in self.composition.keys() | other.composition.keys()
+        }
+        return self._rebuild(total, mixed)
 
 
 class VectorBaseRate(BaseRate):

@@ -1,22 +1,31 @@
-"""Contract tests for ``BaseRate``/``ScalarBaseRate``/``VectorBaseRate``
-(``CLAUDE.md`` #35–#37).
+"""Contract tests for ``BaseRate``/``ScalarBaseRate``/``VectorBaseRate``/
+``CompositionalScalarRateBase`` (``CLAUDE.md`` #22, #35–#37).
 
 Dummy subclasses defined here, not in the package (``VectorBaseRate`` has no
 concrete subclass in ``fluidnet.rate`` yet): ``physics_keys = ("q_a", "q_b")``
-are deliberately dummy — the point is the contract, not the physics.
+are deliberately dummy — the point is the contract, not the physics. The
+mixing/validation/broadcasting tests below exercise ``CompositionalScalarRateBase``
+through ``_CompositionalTestRate`` rather than ``BrineRate`` — that behavior is
+the base's contract, not brine-specific (moved from ``test_rate_algebra.py``).
 """
 
 from __future__ import annotations
 
+import warnings
 from typing import ClassVar
 
 import numpy as np
 import pytest
 
-from fluidnet.rate.base import ScalarBaseRate, VectorBaseRate
+from fluidnet.rate.base import CompositionalScalarRateBase, ScalarBaseRate, VectorBaseRate
 
 
 class _ScalarTestRate(ScalarBaseRate):
+    __slots__ = ()
+    physics_key: ClassVar[str] = "q"
+
+
+class _CompositionalTestRate(CompositionalScalarRateBase):
     __slots__ = ()
     physics_key: ClassVar[str] = "q"
 
@@ -104,3 +113,66 @@ class TestRebuildPreservesConcreteType:
         assert isinstance(rate * 3, _TwoPhaseTestRate)
         assert isinstance(-rate, _TwoPhaseTestRate)
         assert isinstance(rate + _TwoPhaseTestRate(np.array([1.0, 2.0])), _TwoPhaseTestRate)
+
+
+class TestCompositionalScalarRateBaseScaling:
+    def test_scaling_preserves_composition(self) -> None:
+        """#3: __mul__ scales the extensive, composition is invariant."""
+        scaled = _CompositionalTestRate(5.0, {"NaCl": 0.1}) * 3
+        assert scaled.value == 15.0
+        assert scaled.composition == {"NaCl": 0.1}
+
+
+class TestCompositionalScalarRateBaseMixing:
+    def test_weighted_mixing(self) -> None:
+        mixed = _CompositionalTestRate(1.0, {"NaCl": 0.0}) + _CompositionalTestRate(
+            3.0, {"NaCl": 0.2}
+        )
+        assert mixed.value == 4.0
+        assert np.isclose(mixed.composition["NaCl"], 0.15)
+
+    def test_key_union_dilutes_species_absent_from_one_side(self) -> None:
+        mixed = _CompositionalTestRate(1.0, {"NaCl": 0.5}) + _CompositionalTestRate(1.0, {})
+        assert mixed.value == 2.0
+        assert np.isclose(mixed.composition["NaCl"], 0.25)
+
+    def test_zero_contribution_no_warning(self) -> None:
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            mixed = _CompositionalTestRate(0.0, {}) + _CompositionalTestRate(5.0, {"NaCl": 0.1})
+        assert mixed.value == 5.0
+        assert mixed.composition == {"NaCl": 0.1}
+
+    def test_all_zero_junction_no_error(self) -> None:
+        """Every upstream well shut in: guarded denominator yields 0.0,
+        not ZeroDivisionError/RuntimeWarning (ROADMAP §Abiertas, guard is
+        provisional to DAG + non-negative rates)."""
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            mixed = _CompositionalTestRate(0.0, {}) + _CompositionalTestRate(0.0, {})
+        assert mixed.value == 0.0
+
+
+class TestCompositionalScalarRateBaseValidation:
+    def test_negative_scalar_raises(self) -> None:
+        with pytest.raises(ValueError):
+            _CompositionalTestRate(-1.0, {})
+
+    def test_negative_array_element_raises(self) -> None:
+        with pytest.raises(ValueError):
+            _CompositionalTestRate(np.array([1.0, -1.0]), {})
+
+
+class TestCompositionalScalarRateBaseBroadcasting:
+    def test_mixes_against_scalar_valued_rate(self) -> None:
+        vector_rate = _CompositionalTestRate(np.array([1.0, 3.0]), {"NaCl": 0.1})
+        scalar_rate = _CompositionalTestRate(2.0, {"NaCl": 0.1})
+        mixed = vector_rate + scalar_rate
+        assert np.allclose(mixed.value, np.array([3.0, 5.0]))
+        assert np.allclose(mixed.composition["NaCl"], 0.1)
+
+    def test_incompatible_shapes_raise(self) -> None:
+        a = _CompositionalTestRate(np.array([1.0, 3.0]), {"NaCl": 0.1})
+        b = _CompositionalTestRate(np.array([1.0, 2.0, 3.0]), {"NaCl": 0.1})
+        with pytest.raises(ValueError):
+            a + b
