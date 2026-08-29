@@ -351,9 +351,9 @@ Bloque que no existía: `dev` no tenía `.github/` en absoluto.
 - **CI mínimo** — `.github/workflows/checks.yml`: matriz 3.10/3.12,
   `permissions`/`concurrency`, `pre-commit run --all-files` (ruff pineado +
   `lint-imports`), `python -m mypy`, `pytest --cov` (baseline 95%).
-  Pusheado y corriendo — **hoy en rojo por 8 errores de mypy** que no
-  reproducen en local (Windows/3.12) vs. CI (Ubuntu/3.10+3.12); plan de
-  arreglo en `docs/session-log.md` 2026-08-17, próxima sesión.
+  Pusheado y corriendo. Los 8 errores de mypy que no reproducían en local
+  (Windows/3.12) vs. CI (Ubuntu/3.10+3.12) se resolvieron en `2768c01`
+  (2026-08-21) — CI en verde.
 - **`pre-commit` local** — cubre `ruff` y `lint-imports` desde v0.2.
 - **Citabilidad** — `CITATION.cff` (con ORCID) y `CODE_OF_CONDUCT.md`
   (Contributor Covenant 2.1) creados; Zenodo habilitado. Sin DOI hasta el
