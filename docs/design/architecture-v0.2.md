@@ -81,10 +81,34 @@ Rate ──► composición (intensiva, se propaga por la red)
 
 ### 2.1 Rate — la abstracción central
 
-Dataclass (frozen) con álgebra:
+**Corrección 2026-08-29**: esta sección abría con *"Dataclass (frozen) con
+álgebra"*, redacción del Draft 0 anterior a la forma cerrada en `CLAUDE.md`
+#22/#35–#37. `Rate` es un **`Protocol`** de dos miembros; `BaseRate` es una
+**ABC de conveniencia** con `__slots__`, no un dataclass, y opcional por #34
+— la librería anota contra el `Protocol`, nunca contra la base.
 
-- `__add__` → mezcla en nodos de convergencia. Para `ScalarRate` es suma; para rates composicionales, suma de extensivos + mezcla de composición ponderada por caudal.
-- `__mul__` (escalar) → scaling, necesario para el optimizer y para escenarios vectorizados.
+El álgebra queda repartida en dos niveles, y el corte importa:
+
+- `__add__` → mezcla en nodos de convergencia. **Está en el `Protocol`**: es
+  la operación de `propagate_rates`. Para un rate escalar es suma; para uno
+  composicional, suma de extensivos + composición ponderada por caudal.
+  Firma `__add__(self, other: Self) -> Self` (#22): los parámetros son
+  contravariantes, así que prometer `other: Rate` obligaría a toda
+  implementación a aceptar cualquier `Rate` y `BrineRate.__add__(other:
+  BrineRate)` dejaría de satisfacer el protocolo bajo `--strict`.
+- `__mul__` (escalar) / `__neg__` → scaling y orientación de arista. **No
+  están en el `Protocol`** *(corrección 2026-08-28)*: en v0.2 el solver nunca
+  sostiene un objeto `Rate` durante la integración — consume
+  `as_physics_kwargs()` hoisteado (#22) —, así que escalar un `Rate` dejó de
+  ser un requisito genérico. Quedan como conveniencia de `BaseRate`, de cara
+  al optimizer de fitting de v0.5.
+- Sin `__radd__`, sin `mix()`, sin `__sub__` (#22). El balance de nodo es
+  `reduce(add, rates)`, que sólo necesita `__add__`.
+
+Tampoco lleva `physics_key`: el vocabulario canónico vive en las *claves del
+dict* que devuelve `as_physics_kwargs()`, no en un miembro del `Protocol`
+(#21). Declarar ahí la variante escalar excluiría a todo rate vectorial,
+cuyo `ClassVar` es la tupla `physics_keys` (#36).
 
 **Contenido: magnitud extensiva + composición intensiva. Sin propiedades de fluido.** Esta es una corrección explícita del Draft 0 y de las primeras versiones de este documento, que ponían densidad y viscosidad adentro del `Rate`. El rationale del cambio (sesión de diseño 2026-08-07):
 
@@ -146,9 +170,26 @@ core.
 `Fluid` es **stateless**: no es un objeto con densidad 1000, es el **modelo** que sabe mapear `(composición, P, T) → propiedades`.
 
 ```
-Fluid.get_state(*, pressure, temperature=None, composition=...) -> FluidState
-FluidState = NamedTuple(density, viscosity, compressibility, sigma)
+Fluid.bind(*, composition, temperature=None) -> BoundStateModel[SinglePhaseFluidState]
+Fluid.get_state(*, composition, temperature, pressure) -> FluidState
+FluidState: SinglePhaseFluidState | MultiPhaseFluidState
 ```
+
+*Corrección 2026-08-29*: el snippet previo daba
+`FluidState = NamedTuple(density, viscosity, compressibility, sigma)` — la
+forma temprana, anterior a los sufijos de fase de `CLAUDE.md` #19 y al
+ensanchado de campos a `ArrayLike` de #5. **No hay un `sigma` unificado.**
+El estado monofásico usa nombres pelados (`SinglePhaseFluidState`:
+`density`/`viscosity`/`compressibility`, que es lo implementado hoy en
+`state/fluids/single_phase.py`) y el multifásico emite por fase
+(`density_gas`/`density_liquid`/…), porque toda propiedad de mezcla se
+pondera por holdup y el holdup lo calcula la correlación en `physics`, no el
+`StateModel`. La tensión superficial es un campo del estado multifásico —
+consumido por B&B —, no un campo universal de todo `FluidState`.
+`bind`/`__call__` y el `TypeVar` que preserva el estado concreto están
+detallados más abajo en esta misma sección; el bloque de arriba conserva
+`get_state` porque es la forma concreta que expone `Fluid`, no parte del
+`Protocol` neutro.
 
 Esto reconcilia dos cosas que parecen chocar: el fluido es un atributo *declarativo* de la red (lo pone el usuario) y a la vez el rate lo *afecta* (la composición sale de la propagación). Se resuelve porque lo que se declara es el modelo, no el valor.
 

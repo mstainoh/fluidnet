@@ -470,7 +470,7 @@ Rate ──► composición (intensiva)
     sesión, corrección).** El alcance inicial del cambio fue solo
     `RealGas`; la asimetría con `IdealGas` no era una decisión, era que el
     pedido acotó el alcance. `_viscosity_injectables`/`viscosity()` subieron
-    a `CompressibleFluid` (`state/fluids/single_phase_fluids.py`) — un EOS
+    a `CompressibleFluid` (`state/fluids/single_phase.py`) — un EOS
     ideal no implica una correlación de viscosidad `T`-only: `mu = f(T)`
     (Sutherland) es propiedad de la correlación elegida, no de la clase;
     `IdealGas` + LGE (density-dependent) es una combinación válida y usa la
@@ -764,7 +764,9 @@ reversible con `git reset` sin dejar rastro en el historial.
 
 ## Dónde está cada cosa
 
-- `ROADMAP.md` — plan de 3 etapas (MVP v0.2 / v1 / v2), scope in/out por etapa.
+- `ROADMAP.md` — plan por versión (v0.2 / v0.5 / v1.0 / v1.5 / v2.0), scope
+  in/out por etapa, más `## Decisiones` (`### Cerradas` y `### Abiertas`).
+  Las etiquetas "MVP / v1 / v2" se retiraron el 2026-08-07: no las uses.
 - `docs/design/` — ADRs de arquitectura detallada (`architecture-v0.2.md`,
   `physics-single-multiphase.md`).
 - `docs/session-log.md` — bitácora de sesiones, más reciente arriba.
@@ -829,8 +831,12 @@ aplicá directo:
   - **Manual, al cerrar sesión**: `python -m mypy`, `python -m mypy tests/`
     y `pytest`. Son correctitud, no reglas; corren completos y no bloquean
     commits intermedios.
-  - No hay CI todavía: la verificación depende del operador local.
-    Agendado en `ROADMAP §v1.0` (bloque de infraestructura de repositorio).
+  - **CI en `.github/workflows/checks.yml`** (cerrado 2026-08-17, en verde
+    desde `2768c01` el 2026-08-21): matriz 3.10/3.12, `pre-commit run
+    --all-files` (ruff + `lint-imports`), `python -m mypy`, `pytest --cov`.
+    Corre en push a `main`/`dev` y en PR. No reemplaza el nivel manual —
+    `python -m mypy tests/` sigue siendo local únicamente, a propósito (ver
+    más abajo).
 - **`tests/` se chequea según convención existente, pero manual (nunca en
   CI) (2026-08-28).** `ruff` ya cubre `tests/` por default. Para mypy:
   corré `python -m mypy tests/` aparte del comando canónico (no se

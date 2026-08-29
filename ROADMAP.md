@@ -249,8 +249,18 @@ todo agua, o pozos de composición equivalente.
   `propagate_heads`, `to_frames()`, atributo `fluid` de red. Sin clases
   Node/Edge.
 - Solver 1: `forward_propagation`.
-- `Result` (dataclass frozen): terna garantizada `(rate, p_up, p_down)` por
-  edge + `(rate, p)` por nodo + metadata del solve; `to_frames()`.
+- `EdgeResult`: salida de `solve_dp`/`solve_rate` — el estado resuelto de
+  **un eje**, envolviendo el `sol` de `solve_ivp` (`None` en el caso
+  algebraico) más `p_in`/`p_out`/`dp`/`rate`. Es el contenedor que v0.2
+  necesita de verdad.
+  `Result` — salida del **solver de red**, contrato distinto (#42) — es una
+  **red gemela de `nx.DiGraph`**: terna garantizada `(rate, p_up, p_down)`
+  por edge + `(rate, p)` por nodo + metadata del solve, con `to_frames()`
+  como interfaz pública y el grafo como detalle de implementación. Forma
+  cerrada, implementación diferida (#43); no bloquea `LossFunc`/`EdgeResult`.
+  *(corrección 2026-08-29: esta entrada decía "`Result` (dataclass frozen)",
+  redacción anterior a la corrección del 2026-08-17 que ya estaba registrada
+  en §Decisiones cerradas y en el ADR §2.5 pero no se había propagado acá.)*
 - Built-ins de loss: `constant_friction` (baseline para tests/docs) +
   `darcy_weisbach`, **construido sobre `physics/single_phase.py`** (no
   reimplementa física). La capa de loss aporta lo que `physics` no hace:
@@ -360,8 +370,9 @@ Bloque que no existía: `dev` no tenía `.github/` en absoluto.
   primer release — el tag va sobre `main`, que todavía no existe:
   "crear `main` desde `dev`" es parte del checklist de release, no del
   día del tag.
-- **Community guidelines** — `CONTRIBUTING.md` sigue sin escribir.
-  Obligatorio para el submit a JOSS, no urgente antes. Ver §Abiertas.
+- **Community guidelines** — `CONTRIBUTING.md` escrito y pusheado
+  (2026-08-21), cerrando el único ítem que este bloque dejó abierto. Ver
+  §Decisiones→Cerradas para el detalle.
 - **Coverage reportado** en CI — hecho, integrado al step de `pytest`.
 
 Riesgo de dejarlo para el final: es la clase de ítem que se descubre tarde y
@@ -439,7 +450,7 @@ circuitos cerrados: hidráulica de edificios, procesos con recirculación.
    `darcy_weisbach` se implementa sin él.
 5. **Implementar** por piezas chicas siguiendo el mapa de rescate del ADR §3,
    commiteando de a poco contra `dev` limpia. **En curso (2026-08-13)**:
-   `state/protocol.py` + `state/fluids/single_phase_fluids.py`
+   `state/protocol.py` + `state/fluids/single_phase.py`
    (`SinglePhaseFluidState` + `IncompressibleFluid` MVP) con tests.
    `Rate` implementado y testeado (protocolo, `BaseRate` ABC con los dos
    hermanos, `MassRate`/`VolumetricRate`/`BrineRate`). La sesión de
@@ -640,12 +651,13 @@ circuitos cerrados: hidráulica de edificios, procesos con recirculación.
 - **`state/fluids/` (plural) vs. decisión #16.** #16 fija `fluidnet/fluid.py`
   (singular) para evitar colisión visual con `fluids` (ChEDL, oráculo de
   cross-validation en tests). La sesión de código del 2026-08-13 armó en
-  cambio un paquete `state/fluids/` — motivo real: agrupar variantes
-  (`single_phase_fluids.py`, y a futuro `multiphase_fluids.py`) en vez de un
-  módulo único. No hay colisión de import (`fluidnet.state.fluids` es un
-  path distinto de `fluids`), pero sí queda `from fluidnet.state.fluids
-  import ...` conviviendo con `import fluids` en el mismo repo. Pendiente:
-  ¿reabrir #16 para el caso anidado, o renombrar a `state/fluid/`? *(2026-08-13)*
+  cambio un paquete `state/fluids/` — motivo real: agrupar variantes en vez
+  de un módulo único, y hoy ya son dos (`single_phase.py`, `gas.py`; a
+  futuro `multiphase.py`). No hay colisión de import
+  (`fluidnet.state.fluids` es un path distinto de `fluids`), pero sí queda
+  `from fluidnet.state.fluids import ...` conviviendo con `import fluids`
+  en el mismo repo. Pendiente: ¿reabrir #16 para el caso anidado, o
+  renombrar a `state/fluid/`? *(2026-08-13)*
 
 - **¿Adelantar el segundo dominio demo de v2.0 a v0.5?** La fila
   "physics-agnostic" de la tabla de diferenciales es la más débil: está
