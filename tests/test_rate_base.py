@@ -1,7 +1,7 @@
-"""Contract tests for ``BaseRate``/``ScalarRateBase``/``VectorRateBase``
+"""Contract tests for ``BaseRate``/``ScalarBaseRate``/``VectorBaseRate``
 (``CLAUDE.md`` #35–#37).
 
-Dummy subclasses defined here, not in the package (``VectorRateBase`` has no
+Dummy subclasses defined here, not in the package (``VectorBaseRate`` has no
 concrete subclass in ``fluidnet.rate`` yet): ``physics_keys = ("q_a", "q_b")``
 are deliberately dummy — the point is the contract, not the physics.
 """
@@ -13,15 +13,15 @@ from typing import ClassVar
 import numpy as np
 import pytest
 
-from fluidnet.rate.base import ScalarRateBase, VectorRateBase
+from fluidnet.rate.base import ScalarBaseRate, VectorBaseRate
 
 
-class _ScalarTestRate(ScalarRateBase):
+class _ScalarTestRate(ScalarBaseRate):
     __slots__ = ()
     physics_key: ClassVar[str] = "q"
 
 
-class _TwoPhaseTestRate(VectorRateBase):
+class _TwoPhaseTestRate(VectorBaseRate):
     __slots__ = ()
     physics_keys: ClassVar[tuple[str, ...]] = ("q_a", "q_b")
 

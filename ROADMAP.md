@@ -228,7 +228,7 @@ todo agua, o pozos de composición equivalente.
 **Scope IN**
 
 - `Rate` (`Protocol`) + `BaseRate` (ABC de conveniencia) con los hermanos
-  `ScalarRateBase`/`VectorRateBase` (#35–#37). El `Protocol` declara solo
+  `ScalarBaseRate`/`VectorBaseRate` (#35–#37). El `Protocol` declara solo
   `as_physics_kwargs` y `__add__` — sin `__radd__`, sin `mix()`, sin
   `__sub__` (`CLAUDE.md` #22); el balance de nodo es `reduce(add, rates)`.
   `__mul__`/`__neg__` quedan en `BaseRate` (no en el `Protocol`): en v0.2 el
@@ -745,7 +745,7 @@ circuitos cerrados: hidráulica de edificios, procesos con recirculación.
   `__init__` lo bloquea aguas arriba y el DAG mantiene signos consistentes.
   Al habilitar ciclos o convenciones de signo mixtas, convertir el guard en
   `raise`: la condición ya está escrita, es la misma rama. *(2026-08-14)*
-- **Dónde vive la composición en v1.5, con `VectorRateBase` empaquetado y eje
+- **Dónde vive la composición en v1.5, con `VectorBaseRate` empaquetado y eje
   de cantidad primero (`CLAUDE.md` #35–#37).** Antes del refactor a array
   único la pregunta ni se planteaba — la composición era un campo aparte del
   `Rate`. Con `value` como `(n_cantidades, *shape_escenario)`, tres formas
@@ -754,11 +754,11 @@ circuitos cerrados: hidráulica de edificios, procesos con recirculación.
   broadcasting que #36), (b) un atributo separado del `Rate` (lo que hacía
   `BrineRate` hasta ahora, `dict[str, ArrayLike]` — ver `CLAUDE.md` #22), o
   (c) `_combine` con promedio ponderado operando sobre una estructura
-  distinta a `value`. No bloquea v0.2 (`BrineRate` es `ScalarRateBase`, no
-  toca `VectorRateBase`); aparece recién cuando un rate multifásico necesite
+  distinta a `value`. No bloquea v0.2 (`BrineRate` es `ScalarBaseRate`, no
+  toca `VectorBaseRate`); aparece recién cuando un rate multifásico necesite
   cargar composición, que es v1.5. Anotado a partir de este refactor de
   `BaseRate`, no antes. *(2026-08-14)*
-- **Primera subclase concreta de `VectorRateBase`.** El esqueleto está
+- **Primera subclase concreta de `VectorBaseRate`.** El esqueleto está
   implementado y testeado (#35–#37) pero no hay ninguna subclase en el
   package — los únicos ejercitantes son los dummies de
   `tests/test_rate_base.py`. El contrato de eje queda declarado y
@@ -771,7 +771,7 @@ circuitos cerrados: hidráulica de edificios, procesos con recirculación.
   `"State" has no attribute "density"` — el bug real del
   `BoundStateModel` no genérico. Se repite ahora con más consecuencia:
   los dummies de `test_rate_base.py` son los únicos ejercitantes de
-  `VectorRateBase`, así que su contrato está verificado en runtime pero
+  `VectorBaseRate`, así que su contrato está verificado en runtime pero
   no estáticamente. Contra el principio 7 (todo claim declarado se
   verifica automáticamente). **Mecanismo cerrado (2026-08-17)**: `files =
   ["src/fluidnet", "tests"]` + `namespace_packages = true` +
@@ -804,7 +804,7 @@ circuitos cerrados: hidráulica de edificios, procesos con recirculación.
   cuando llegue el primer multifásico real — en `loss_func` (hoy es
   afirmación de diseño sin firma ni consumidor) o el `State` emite ya los
   rates por fase. Conecta con la entrada de composición en
-  `VectorRateBase`. *(2026-08-14)*
+  `VectorBaseRate`. *(2026-08-14)*
 - **Índice de `diagnose()` en v0.5: `(edge, x)` es el degenerado de
   `(edge, x, escenario)`.** Con vectorización por escenarios cada campo de
   `_detailed` deja de ser escalar y pasa a ser array sobre el eje de

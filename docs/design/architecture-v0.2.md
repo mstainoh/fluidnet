@@ -128,14 +128,14 @@ core.
 **Alternativas descartadas (`BaseRate`, `CLAUDE.md` #35–#37).**
 
 - *Clase única con `physics_keys: tuple[str, ...]` siempre, escalar como
-  1-tupla.* Habría evitado la partición en `ScalarRateBase`/`VectorRateBase`.
+  1-tupla.* Habría evitado la partición en `ScalarBaseRate`/`VectorBaseRate`.
   Descartada por legibilidad del camino caliente — `as_physics_kwargs()`
   devolviendo `{key: value}` para el caso escalar, sin desempaquetar una
   1-tupla en cada `__init__`/`__repr__`/callsite — **no por performance**:
   `as_physics_kwargs()` está hoisteado fuera de `solve_ivp` (`CLAUDE.md`
   #22), así que ninguna de las dos formas paga costo en el loop caliente.
-- *Asimetría de validación deliberada.* `VectorRateBase.__init__` hace
-  `asarray` + chequeo de `shape[0] == len(physics_keys)`; `ScalarRateBase`
+- *Asimetría de validación deliberada.* `VectorBaseRate.__init__` hace
+  `asarray` + chequeo de `shape[0] == len(physics_keys)`; `ScalarBaseRate`
   no valida nada. No es una inconsistencia a limpiar: un escalar no tiene
   eje de cantidad que pueda desalinearse, así que no hay invariante que
   proteger. El costo de validar ahí sería ritual, igual que un dict
@@ -353,9 +353,9 @@ fitting de v0.5 — ver ROADMAP §Abiertas para el alcance real de ese caso
 (no es tan directo como "apilar y listo").
 
 **Complementaria, no contradictoria, con "eje de cantidad primero" de
-`VectorRateBase`** (`CLAUDE.md` #36). Son dos arrays distintos con roles de
+`VectorBaseRate`** (`CLAUDE.md` #36). Son dos arrays distintos con roles de
 eje distintos: acá el eje "último" es el de escenario/evaluación de
-`across`/`x`; en `VectorRateBase.value` el eje "primero" es el de cantidad
+`across`/`x`; en `VectorBaseRate.value` el eje "primero" es el de cantidad
 (las fases de un rate multifásico). Un `Rate` multi-cantidad vectorizado por
 escenarios termina con shape `(n_cantidades, *shape_escenario)` — cantidad
 adelante para que `__mul__` por fracción de split broadcastee bien (#36),

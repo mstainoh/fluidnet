@@ -5,13 +5,13 @@ from typing import TYPE_CHECKING, ClassVar
 import numpy as np
 
 from fluidnet._types import ArrayLike
-from fluidnet.rate.base import ScalarRateBase
+from fluidnet.rate.base import ScalarBaseRate
 
 if TYPE_CHECKING:
     from typing_extensions import Self
 
 
-class BrineRate(ScalarRateBase):
+class BrineRate(ScalarBaseRate):
     """Brine mass flow rate [kg/s]. Composition is a passive tracer (v0.2):
     it propagates and mixes, with no feedback on physical properties."""
 

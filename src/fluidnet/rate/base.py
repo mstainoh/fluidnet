@@ -10,7 +10,7 @@ otherwise rewrite: mix at a node (``__add__``), scale by a split fraction
 Most rate quantities reduce to a float or a 1D array of floats, so the only
 thing an implementation needs is the mapping from quantity to
 the keyword the solver equation expects. That mapping is what the two
-concrete siblings provide: ``ScalarRateBase`` and ``VectorRateBase``, which
+concrete siblings provide: ``ScalarBaseRate`` and ``VectorBaseRate``, which
 share no inheritance between them since the scalar and vector
 ``physics_key`` conventions are incompatible ``ClassVar`` shapes.
 """
@@ -77,7 +77,7 @@ class BaseRate(ABC):
         return f"{type(self).__name__}({self.value!r})"
 
 
-class ScalarRateBase(BaseRate):
+class ScalarBaseRate(BaseRate):
     """
     ``BaseRate`` convenience for a single named physics quantity (#35).
 
@@ -97,7 +97,7 @@ class ScalarRateBase(BaseRate):
         return {self.physics_key: self.value}
 
 
-class VectorRateBase(BaseRate):
+class VectorBaseRate(BaseRate):
     """``BaseRate`` convenience for a packed multi-quantity rate (#35).
 
     ``value`` has shape ``(n_quantities, *scenario_shape)`` — quantity axis
